@@ -171,6 +171,7 @@ STATUSC RPNSSend(RQSTDAT *rqst, SOCKET sock) {
         HASHLIST *message = MSGEncode(body->msg, body->msglen);
         MSGStartAction(message, ppackage);
         HashListClean(message);
+        MEMFree(message);
     }
     else if (body->type == RT_GET) {
         HTTPRESPONSE(package, OK_SUCCESS);
@@ -255,15 +256,41 @@ login_end:
         if (instancesobj == NULL) goto incorrect_message;
         STRVAL *instancesstr = cast(instancesobj->obj.data, STRVAL*);
 
-        client->tempdat = instancesstr->p;
-        /*for (size_t i = 0; i < DEFAULT_LOG_LEN; i++) {
+        MEMFree(client->tempdat.instances);
+        client->tempdat.instances = instancesstr->p;
+        
+        HASHLIST clientsdat = {0};
+        TBuff(STRVAL, DEFAULT_LOG_LEN) namekeys = {0};
+        HashListRealloc(&clientsdat, HASHLIST_STARTSIZE);
+        
+        for (size_t i = 0; i < DEFAULT_LOG_LEN; i++) {
             RBXCLIENT curclient = RBXClients.buff[i];
-            char *name = curclient.name;
-            if (name == NULL) continue;
-            char *clientdat = curclient.tempdat;
-        }*/
+            STRVAL name = STRVALObj(curclient.name, 0);
+            if (name.p == NULL) continue;
 
-        HTTPRESPONSE(package, OK_SUCCESS);
+            name.len = strlen(name.p);
+            HASHLIST clientdat = {0};
+            HashListRealloc(&clientdat, HASHLIST_STARTSIZE);
+            RBXCLIENTDAT tempdat = curclient.tempdat;
+            STRVAL keys[1] = {STRConst("INSTANCES")};
+            STRVAL instanceskey = keys[0];
+            size_t instanceslen = strlen(tempdat.instances)+1;
+            char *instances = ARRAlloc(char, instanceslen);
+            memcpy(instances, tempdat.instances, instanceslen);
+            TYPEOBJECT instancesobj = TYPEObj(instances, DT_LIST);
+            HashSetVal(&clientdat, instanceskey, instancesobj);
+
+            char *msgform = MSGDecode(&clientdat, keys, sizeof(keys)/sizeof(STRVAL));
+            TYPEOBJECT msgobj = TYPEObj(msgform, DT_LIST);
+            HashSetVal(&clientsdat, name, msgobj);
+            namekeys.buff[namekeys.len] = name;
+            namekeys.len++;
+            HashListClean(&clientdat);
+        }
+        char *msgpackage = MSGDecode(&clientsdat, namekeys.buff, namekeys.len);
+        HashListClean(&clientsdat);
+        HTTPRESPONSE(package, msgpackage);
+        MEMFree(msgpackage);
     }
 
     #undef istype
