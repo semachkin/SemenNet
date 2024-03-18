@@ -34,7 +34,7 @@ InlineApi uint16_t hashfunc(STRVAL str) {
 
 HASHSTRVAL *HashGet(HASHLIST *list, STRVAL key) {
     uint16_t hash = hashfunc(key);
-    printf("indexing %x hash\n", hash);
+    printf("a");
     for (HASHSTRVAL *v = list->buff[hash & (list->size-1)]; v != NULL; v = v->last) {
         if (v == NULL) break;
         if (v->hash != hash) continue;

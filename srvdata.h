@@ -11,7 +11,7 @@
 #define DEFAULT_PROTOCOL 0
 #define DEFAULT_LOG_LEN 15
 
-#define MAX_TIME_WITHOUT_REQUESTS 5
+#define MAX_TIME_WITHOUT_REQUESTS 100
 
 #define INVALID_TOKEN ((~(size_t)0)-2)
 #define MAX_HASHLIST_SIZE ((~(uint16_t)0)-2)
@@ -22,7 +22,7 @@
 
 #define FD_SETSIZE DEFAULT_LOG_LEN+1
 
-#define RQST_LEN 4096
+#define RQST_LEN 8192
 
 #define RECV_FLAGS 0
 #define SEND_FLAGS MSG_DONTROUTE
@@ -55,10 +55,14 @@ typedef struct TYPEOBJECT_S {
     ENUMT type;
 } TYPEOBJECT;
 
+typedef struct RBXCLIENTDAT_S {
+    char *instances;
+} RBXCLIENTDAT;
+
 typedef struct RBXCLIENT_S {
     char *token;
     char *name;
-    char *tempdat;
+    RBXCLIENTDAT tempdat;
     time_t lrqst;
 } RBXCLIENT;
 
@@ -139,7 +143,7 @@ enum datatype {
 
 #define printloghead time_t df = difftime(time(0), __server_start_time)
 #define printdifftime (df/60), (df%60)
-#define printlogform "========== at %02lld:%02lld ==========\n"
+#define printlogform "\n========== at %02lld:%02lld ==========\n"
 
 #define printlog1(f) { printloghead; printf(printlogform f "\n", printdifftime); }
 #define printlog2(f, a0) { printloghead; printf(printlogform f "\n", printdifftime, a0); }
@@ -156,9 +160,9 @@ enum datatype {
             { RBXClients.buff[i] = c; RBXClients.len++; break; }
 
 #define RBXClientClean(c) \
-    MEMFree(c.name); \
-    MEMFree(c.token); \
-    MEMFree(c.tempdat);
+    free(c.name); \
+    free(c.token); \
+    MEMFree(c.tempdat.instances)
 
 #define SOCKDInit(d) \
     d.sin_family = AF_INET; \
@@ -206,6 +210,8 @@ enum datatype {
 #define STRVALObj(p, l) ((STRVAL){p, l})
 #define TYPEObj(d, t) ((TYPEOBJECT){d, t})
 
+#define STRConst(s) (STRVALObj(s, sizeof(s)-1))
+
 #define life for (;;)
 
 #define InlineApi static inline
@@ -227,6 +233,7 @@ enum datatype {
 
 void RQSTParse(RQSTDAT *rqst);
 HASHLIST *MSGEncode(char *msg, size_t msglen);
+char *MSGDecode(HASHLIST *list, STRVAL *keys, size_t keysc);
 
 HASHSTRVAL *HashGet(HASHLIST *list, STRVAL key);
 void HashSetVal(HASHLIST *list, STRVAL key, TYPEOBJECT val);
