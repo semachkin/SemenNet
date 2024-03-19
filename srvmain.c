@@ -4,8 +4,11 @@
 #include <time.h>
 #include "srvdata.h"
 
+static time_t __server_start_time;
+static CONFIG configs;
+
 void WSAfatalerr() {
-    fprintf(stderr, "WSA Error: %d", WSAGetLastError());
+    printwarn2("WSA Error: %d", WSAGetLastError());
     WSACleanup();
     exit(EXIT_FAILURE);
 }
@@ -19,15 +22,16 @@ static TBuff(RBXCLIENT, DEFAULT_LOG_LEN) RBXClients = {0};
 
 size_t RBXClientFind(STRVAL token);
 void RBXClientsVerify();
-
-static time_t __server_start_time;
+void CNFGInit(CONFIG *cnfg);
 
 int main(void) {
     WSADATA wsadat;
     WSAAssert(WSAStartup(WINSOCK_VERSION, &wsadat), ==SOCKET_ERROR);
 
+    CNFGInit(&configs);
+
     SOCKADDR_IN serverdat;
-    SOCKDInit(serverdat);
+    SOCKDInit(serverdat, configs.srvport);
     
     SOCKET serversock;
     uint8_t socklen;
@@ -40,13 +44,13 @@ int main(void) {
     // sockets options
     BOOL reuse_val = TRUE;
     DWORD rcvtimeo_val = 1000;
-    TIMEVAL seltimeo = {0, 500000};
+    TIMEVAL seltimeo = {0, 10000};
 
     WSAAssert(SOCKOpt(serversock, SOL_SOCKET, SO_REUSEADDR, (char*)&reuse_val, sizeof(BOOL)), ==SOCKET_ERROR);
     WSAAssert(SOCKBind(serversock, (const PSOCKADDR)&serverdat, socklen), ==SOCKET_ERROR);
 
-    printlog3("Server socket as %s:%d", SINIP(serverdat.sin_addr), SINPORT(serverdat.sin_port));
-    
+    printinfo3("Server socket as %s:%d", SINIP(serverdat.sin_addr), SINPORT(serverdat.sin_port));
+
     WSAAssert(SOCKList(serversock, DEFAULT_LOG_LEN), ==SOCKET_ERROR);
 
     CLIENTSDAT clientsdat;
@@ -68,15 +72,14 @@ int main(void) {
         WSAAssert(selres = SOCKSel(0, &clientsdat, NULL, NULL, &seltimeo), ==SOCKET_ERROR);
         if (selres > 0) {
             WSAAssert(lcur = SOCKAccept(serversock, (const PSOCKADDR)&tempdat, (int*)&socklen), ==INVALID_SOCKET || (lcur ==SOCKET_ERROR));
-            printlog3("Connected to %s:%d", SINIP(tempdat.sin_addr), SINPORT(tempdat.sin_port));
+            printinfo3("Connected to %s:%d", SINIP(tempdat.sin_addr), SINPORT(tempdat.sin_port));
 
             if (llen < DEFAULT_LOG_LEN) {
                 lbuff[llen] = lcur;
                 llen++;
-                printf("Client %d added\n", llen);
             }
             else {
-                printf("Server full\n");
+                printwarn1("Server full.. request rejected\n");
                 temprqstdat.err = STATUS_server_full;
                 WSAAssert(RPNSSend(&temprqstdat, lcur), ==STATUS_send_error);
             }
@@ -92,7 +95,7 @@ int main(void) {
         for (i = 0; i < llen; i++) {
             lcur = lbuff[i];
             if (!FD_ISSET(lcur, &clientsdat)) { 
-                printf("Client %d not activity\n", i);
+                printwarn2("Client %d not activity.. disconnecting\n", i);
                 goto remove_sock; 
             }
 
@@ -106,21 +109,16 @@ int main(void) {
                 RQSTDInit(temprqstdat);
                 STATUSC sentres = RPNSSend(&temprqstdat, lcur);
 
-                if (sentres > STATUS_success) {
-                    printf("Send result %x\n", sentres);
-                    goto remove_sock;
-                }
+                if (sentres > STATUS_success) goto remove_sock;
                 continue;
             }
-            else {
-                printf("Bufflen is %d\n", temprqstdat.bufflen);
+            else 
                 goto remove_sock;
-            }
             continue;
 
 remove_sock:
             WSAAssert(SOCKGetName(lcur, (const PSOCKADDR)&tempdat, (int*)&socklen), ==SOCKET_ERROR);
-            printlog3("Disconnect at %s:%d", SINIP(tempdat.sin_addr), SINPORT(tempdat.sin_port));
+            printinfo3("Disconnect at %s:%d", SINIP(tempdat.sin_addr), SINPORT(tempdat.sin_port));
             SOCKClose(lcur);
             lbuff[i] = 0;
             LISTAlign(clientslist);
@@ -171,13 +169,13 @@ STATUSC RPNSSend(RQSTDAT *rqst, SOCKET sock) {
         HASHLIST *message = MSGEncode(body->msg, body->msglen);
         MSGStartAction(message, ppackage);
         HashListClean(message);
-        MEMFree(message);
+        free(message);
     }
     else if (body->type == RT_GET) {
         HTTPRESPONSE(package, OK_SUCCESS);
     }
 
-    MEMFree(body);
+    free(body);
 send_start:
     
     size_t packagelen = strlen(ppackage);
@@ -188,17 +186,15 @@ send_start:
             SOCKClose(sock);
             break; 
         }
-        ppackage += sentlen;
-        packagelen -= sentlen;
     }
 
     switch (sentlen) {
         case SOCKET_ERROR: {
-            printlog1("Error sending data, reconnect");
+            printinfo1("Error sending data, reconnect");
             return STATUS_send_error;
         };
         case 0: {
-            printlog1("Client closed connection");
+            printinfo1("Client closed connection");
             return STATUS_client_close;
         }
     }
@@ -209,12 +205,14 @@ send_start:
 void MSGStartAction(HASHLIST *list, char *package) {
     // indexing message type
 
-    HASHSTRVAL *typeobj; HashIndexing(list, "MT", typeobj);
+    HASHSTRVAL *typeobj; 
+    HashIndexing(list, "MT", typeobj);
     if (typeobj == NULL) goto incorrect_message;
     char *typestr = cast(typeobj->obj.data, STRVAL*)->p;
 
     // indexing token
-    HASHSTRVAL *tokenobj; HashIndexing(list, "TOKEN", tokenobj);
+    HASHSTRVAL *tokenobj; 
+    HashIndexing(list, "TOKEN", tokenobj);
     if (tokenobj == NULL) goto incorrect_message;
     STRVAL *tokenstr = cast(tokenobj->obj.data, STRVAL*);
 
@@ -228,22 +226,24 @@ void MSGStartAction(HASHLIST *list, char *package) {
 
         size_t idx = RBXClientFind(*tokenstr);
         if (idx != INVALID_TOKEN) {
-            printlog2("Rbx Client %lld Re authorization attempt", idx);
+            printinfo2("Rbx Client %lld Re authorization attempt", idx);
             goto login_end;
         }
         char *clienttoken; STRPrint(clienttoken, (*tokenstr));
         char *clientname; STRPrint(clientname, (*namestr));
-        RBXCLIENT client = {clienttoken, clientname};
+        RBXCLIENT client = {0};
+        client.token = clienttoken;
+        client.name = clientname;
         RBXClientAdd(client);
 
-        printlog2("Rbx Client %s login to server", clientname);
+        printinfo2("Rbx Client %s login to server", clientname);
         HTTPRESPONSE(package, OK_SUCCESS);
     }
 
 login_end:
     size_t RBXClientIdx = RBXClientFind(*tokenstr);
     if (RBXClientIdx == INVALID_TOKEN) {
-        printf("unathorized\n");
+        printwarn1("Unathorized request attempt\n");
         HTTPRESPONSE(package, ERR_INVALID_CLIENT);
         return;
     }
@@ -251,13 +251,18 @@ login_end:
     client->lrqst = time(0); // update last request time
 
     if (istype("DATAEX")) {
+        HTTPRESPONSE(package, OK_SUCCESS);
         // indexing instances
-        HASHSTRVAL *instancesobj; HashIndexing(list, "INSTANCES", instancesobj);
+        HASHSTRVAL *instancesobj; 
+        HashIndexing(list, "INSTANCES", instancesobj);
         if (instancesobj == NULL) goto incorrect_message;
         STRVAL *instancesstr = cast(instancesobj->obj.data, STRVAL*);
 
         MEMFree(client->tempdat.instances);
-        client->tempdat.instances = instancesstr->p;
+        char *instancesdump = ARRAlloc(char, instancesstr->len + 1);
+        memcpy(instancesdump, instancesstr->p, instancesstr->len);
+        instancesdump[instancesstr->len] = Sf;
+        client->tempdat.instances = instancesdump;
         
         HASHLIST clientsdat = {0};
         TBuff(STRVAL, DEFAULT_LOG_LEN) namekeys = {0};
@@ -275,13 +280,15 @@ login_end:
             STRVAL keys[1] = {STRConst("INSTANCES")};
             STRVAL instanceskey = keys[0];
             size_t instanceslen = strlen(tempdat.instances)+1;
-            char *instances = ARRAlloc(char, instanceslen);
-            memcpy(instances, tempdat.instances, instanceslen);
-            TYPEOBJECT instancesobj = TYPEObj(instances, DT_LIST);
+            STRVAL *instances = ARRAlloc(STRVAL, 1);
+            instances->p = tempdat.instances;
+            instances->len = instanceslen;
+            TYPEOBJECT instancesobj = TYPEObj(instances, DT_STRING);
             HashSetVal(&clientdat, instanceskey, instancesobj);
 
             char *msgform = MSGDecode(&clientdat, keys, sizeof(keys)/sizeof(STRVAL));
             TYPEOBJECT msgobj = TYPEObj(msgform, DT_LIST);
+            printf("a");
             HashSetVal(&clientsdat, name, msgobj);
             namekeys.buff[namekeys.len] = name;
             namekeys.len++;
@@ -290,9 +297,10 @@ login_end:
         char *msgpackage = MSGDecode(&clientsdat, namekeys.buff, namekeys.len);
         HashListClean(&clientsdat);
         HTTPRESPONSE(package, msgpackage);
-        MEMFree(msgpackage);
+        free(msgpackage);
     }
 
+    system("cls");
     #undef istype
     return;
 
@@ -309,7 +317,7 @@ void RBXClientsVerify() {
         uint16_t diff = (uint16_t)difftime(curtime, client.lrqst);
 
         if (diff > MAX_TIME_WITHOUT_REQUESTS) {
-            printlog2("Rbx Client %s disconnected", client.name);
+            printinfo2("Rbx Client %s disconnected", client.name);
             RBXClientClean(client);
             RBXClients.buff[i] = (RBXCLIENT){0};
         }
@@ -324,4 +332,13 @@ inline size_t RBXClientFind(STRVAL token) {
             return i;
     }
     return INVALID_TOKEN;
+}
+
+void CNFGInit(CONFIG *cnfg) {
+    LPCSTR inifile = CONFIG_FILE;
+
+    INIReadInt(cnfg->srvport, DEFAULT_PORT, "server", "port", inifile);
+
+    INIReadString(cnfg->logf, DEFAULT_LOGFILE, "logs", "log_file", inifile);
+    INIReadInt(cnfg->loglvl, DEFAULT_LOGLVL, "logs", "log_level", inifile);
 }

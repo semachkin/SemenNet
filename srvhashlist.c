@@ -21,6 +21,7 @@ void HashListRealloc(HASHLIST *list, uint16_t newsize) {
             else last = last->last;
         }
     }
+    MEMFree(list->buff);
     list->buff = newbuff;
     list->size = newsize;
 }
@@ -34,13 +35,12 @@ InlineApi uint16_t hashfunc(STRVAL str) {
 
 HASHSTRVAL *HashGet(HASHLIST *list, STRVAL key) {
     uint16_t hash = hashfunc(key);
-    printf("a");
-    for (HASHSTRVAL *v = list->buff[hash & (list->size-1)]; v != NULL; v = v->last) {
-        if (v == NULL) break;
-        if (v->hash != hash) continue;
-        return v;
+    printf("%x; ", hash);
+    for (HASHSTRVAL *v = list->buff[hash & (list->size-1)]; v != NULL;) {
+        if (v->hash == hash) return v;
+        v = v->last;
     }
-    return NULL;
+    return cast(0, HASHSTRVAL*);
 }
 
 InlineApi HASHSTRVAL *newHashVal(HASHLIST *list, TYPEOBJECT val, uint16_t hash) {
@@ -72,9 +72,13 @@ void HashSetVal(HASHLIST *list, STRVAL key, TYPEOBJECT val) {
 }
 
 void HashListClean(HASHLIST *list) {
-    for (uint16_t i = 0; i < list->size; i++)
-        for (HASHSTRVAL *o = list->buff[i]; o != NULL; o = o->last) {
+    for (uint16_t i = 0; i < list->size; i++) {
+        HASHSTRVAL *last = NULL;
+        for (HASHSTRVAL *o = list->buff[i]; o != NULL; o = last) {
             MEMFree(o->obj.data);
-            MEMFree(o);
+            last = o->last;
+            free(o);
         }
+    }
+    free(list->buff);
 }

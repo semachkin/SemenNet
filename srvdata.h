@@ -1,7 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#define SERVER_PORT 1917
+#define CONFIG_FILE "./config.ini"
 
 #pragma region constants
 
@@ -11,18 +11,22 @@
 #define DEFAULT_PROTOCOL 0
 #define DEFAULT_LOG_LEN 15
 
-#define MAX_TIME_WITHOUT_REQUESTS 100
+#define DEFAULT_PORT 1917
+#define DEFAULT_LOGLVL 2
+#define DEFAULT_LOGFILE "dump.log"
+
+#define MAX_TIME_WITHOUT_REQUESTS 10
 
 #define INVALID_TOKEN ((~(size_t)0)-2)
 #define MAX_HASHLIST_SIZE ((~(uint16_t)0)-2)
 
-#define HASHLIST_STARTSIZE 2
+#define HASHLIST_STARTSIZE 16
 
 #define LIST_EXTRA_CLOSE_BYTES 10*2
 
 #define FD_SETSIZE DEFAULT_LOG_LEN+1
 
-#define RQST_LEN 8192
+#define RQST_LEN 10240
 
 #define RECV_FLAGS 0
 #define SEND_FLAGS MSG_DONTROUTE
@@ -36,14 +40,22 @@
 #pragma endregion
 
 #include <winsock2.h>
+#include <windows.h>
 
 #pragma region types
 
 #define TBuff(t, l) struct {t buff[l]; size_t len;}
 
+typedef FILE *filep;
 typedef unsigned char ENUMT;
 typedef unsigned short STATUSC;
 typedef fd_set CLIENTSDAT;
+
+typedef struct CONFIG_S {
+    uint32_t srvport;
+    ENUMT loglvl;
+    char logf[MAX_PATH];
+} CONFIG;
 
 typedef struct STRVAL_S {
     char *p; 
@@ -141,13 +153,20 @@ enum datatype {
 
 #pragma region macros
 
-#define printloghead time_t df = difftime(time(0), __server_start_time)
+#define printhead filep lf = fopen(configs.logf, "a+"); time_t df = difftime(time(0), __server_start_time);
 #define printdifftime (df/60), (df%60)
-#define printlogform "\n========== at %02lld:%02lld ==========\n"
+#define printinfocond (configs.loglvl > 0)
+#define printwarncond (configs.loglvl > 1)
+#define printinfoform "========== INFO at %02lld:%02lld ==========\n"
+#define printwarnform "========== WARNING at %02lld:%02lld ==========\n"
+#define printfoot fclose(lf);
 
-#define printlog1(f) { printloghead; printf(printlogform f "\n", printdifftime); }
-#define printlog2(f, a0) { printloghead; printf(printlogform f "\n", printdifftime, a0); }
-#define printlog3(f, a0, a1) { printloghead; printf(printlogform f "\n", printdifftime, a0, a1); }
+#define printinfo1(f) if printinfocond { printhead fprintf(lf, printinfoform f "\n", printdifftime); printfoot }
+#define printinfo2(f, a0) if printinfocond { printhead fprintf(lf, printinfoform f "\n", printdifftime, a0); printfoot }
+#define printinfo3(f, a0, a1) if printinfocond { printhead fprintf(lf, printinfoform f "\n", printdifftime, a0, a1); printfoot }
+
+#define printwarn1(f) if printwarncond { printhead fprintf(lf, printwarnform f "\n", printdifftime); printfoot }
+#define printwarn2(f, a0) if printwarncond { printhead fprintf(lf, printwarnform f "\n", printdifftime, a0); printfoot }
 
 #define cast(a, t) ((t)(a))
 
@@ -164,10 +183,10 @@ enum datatype {
     free(c.token); \
     MEMFree(c.tempdat.instances)
 
-#define SOCKDInit(d) \
+#define SOCKDInit(d, port) \
     d.sin_family = AF_INET; \
     d.sin_addr.s_addr = INADDR_ANY; \
-    d.sin_port = SINPORT(SERVER_PORT)
+    d.sin_port = SINPORT(port)
 
 #define FDClean(d) \
     FD_ZERO(&d); \
@@ -180,15 +199,15 @@ enum datatype {
         l.buff[DEFAULT_LOG_LEN-1] = cast(0, SOCKET); \
     }
 
+#define ARRAlloc(t, s) (cast(malloc(s*sizeof(t)), t*))
+
 #define STRPrint(pt, o) \
-    { pt = malloc(o.len+1); memcpy(pt, o.p, o.len); pt[o.len] = Sf; }
+    { pt = ARRAlloc(char, o.len+1); memcpy(pt, o.p, o.len); pt[o.len] = Sf; }
 
 #define HashIndexing(l, s, p) \
     { STRVAL key = STRVALObj(s, strlen(s)); p = HashGet(l, key); }
 
 #define RQSTDInit(d) (d.err = RQSTInit(&d))
-
-#define ARRAlloc(t, s) (cast(malloc(s*sizeof(t)), t*))
 
 #define SINPORT htons
 #define SINIP inet_ntoa
@@ -203,6 +222,9 @@ enum datatype {
 #define SOCKOpt setsockopt
 #define SOCKSel select
 #define SOCKGetName getpeername
+
+#define INIReadInt(v, d, a, k, f) (v = GetPrivateProfileIntA(a, k, d, f))
+#define INIReadString(v, d, a, k, f) (GetPrivateProfileStringA(a, k, d, v, sizeof(v), f))
 
 #define WSAAssert(a, b) if ((a) b) WSAfatalerr()
 #define WSAAssertO(a, b, e, c) if ((a) b) { if (WSAGetLastError() == e) { c } else WSAfatalerr(); }
@@ -235,9 +257,9 @@ void RQSTParse(RQSTDAT *rqst);
 HASHLIST *MSGEncode(char *msg, size_t msglen);
 char *MSGDecode(HASHLIST *list, STRVAL *keys, size_t keysc);
 
-HASHSTRVAL *HashGet(HASHLIST *list, STRVAL key);
 void HashSetVal(HASHLIST *list, STRVAL key, TYPEOBJECT val);
 void HashListRealloc(HASHLIST *list, uint16_t newsize);
 void HashListClean(HASHLIST *list);
+HASHSTRVAL *HashGet(HASHLIST *list, STRVAL key);
 
 #endif

@@ -15,6 +15,7 @@ HASHLIST *MSGEncode(char *msg, size_t msglen) {
     HASHLIST *list = ARRAlloc(HASHLIST, 1);
     list->nuse = 0;
     list->size = 0;
+    list->buff = NULL;
     HashListRealloc(list, HASHLIST_STARTSIZE);
 
     char *msgstart = msg;
@@ -50,7 +51,7 @@ HASHLIST *MSGEncode(char *msg, size_t msglen) {
         STRVAL val = STRVALObj(start, ++len);
         seekto(MA_NXTELMNT, 1);
 
-        TYPEOBJECT obj;
+        TYPEOBJECT obj = TYPEObj(NULL, DT_NULL);
         switch (type) {
             case DT_LIST: {
                 start = msg;
@@ -63,20 +64,17 @@ HASHLIST *MSGEncode(char *msg, size_t msglen) {
 
                 findcloser(MA_LIST, MA_LISTEND);
                 size_t listlen = msg - val.p;
-                char *listobj = ARRAlloc(char, ++listlen);
+                msg++;
+                char *listobj = ARRAlloc(char, listlen+1);
                 memcpy(listobj, val.p, listlen);
                 listobj[listlen] = Sf;
-                STRVAL *strobj = ARRAlloc(STRVAL, 1);
-                strobj->p = listobj;
-                strobj->len = listlen - 1;
-                obj = TYPEObj(strobj, DT_LIST);
-                msg = start;
+                obj = TYPEObj(listobj, DT_LIST);
             }
             break;
             case DT_STRING: {
                 STRVAL *valobj = ARRAlloc(STRVAL, 1);
                 *valobj = val;
-                obj = TYPEObj(valobj, DT_LIST);
+                obj = TYPEObj(valobj, DT_STRING);
             }
             break;
             case DT_NUMBER: {
@@ -86,7 +84,7 @@ HASHLIST *MSGEncode(char *msg, size_t msglen) {
                 obj = TYPEObj(numobj, DT_NUMBER);
             }
             break;
-            case DT_VECTOR3: {
+            /*case DT_VECTOR3: {
                 double *vectorobj = ARRAlloc(double, 3);
                 char *xend = start + 8;  
                 vectorobj[0] = strtod(start, &xend);
@@ -107,9 +105,7 @@ HASHLIST *MSGEncode(char *msg, size_t msglen) {
                 vectorobj[2] = cast(strtod(gend, &bend), uint8_t);
                 obj = TYPEObj(vectorobj, DT_COLOR3);
             }
-            break;
-            default:
-                obj = TYPEObj(NULL, DT_NULL);
+            break;*/
         }
 
         HashSetVal(list, key, obj);
