@@ -4,7 +4,9 @@ EXE := server
 FLAGS := -std=c99 -Wall
 LIBS := -lwsock32 -lws2_32
 
+SRC := ./server/
 TMP := ./temp/
+
 NEED := $(TMP)srvmain.o $(TMP)srvencoder.o $(TMP)srvhashlist.o
 
 FOOT = -o $@
@@ -14,7 +16,7 @@ $(EXE): $(NEED)
 	$(CR) $(FLAGS) $(NEED) $(FOOT) $(LIBS)
 	@echo ====== SUCCESS BUILD ======
 
-$(TMP)%.o: %.c
+$(TMP)%.o: $(SRC)%.c
 	$(CR) $(FLAGS) $(HEAD) $(FOOT) $(LIBS)
 
 clean:
