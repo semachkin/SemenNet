@@ -77,6 +77,7 @@ int main(void) {
             if (llen < DEFAULT_LOG_LEN) {
                 lbuff[llen] = lcur;
                 llen++;
+                printf("Client %d added\n", llen);
             }
             else {
                 printwarn1("Server full.. request rejected\n");
@@ -190,11 +191,11 @@ send_start:
 
     switch (sentlen) {
         case SOCKET_ERROR: {
-            printinfo1("Error sending data, reconnect");
+            printwarn1("Error sending data, reconnect");
             return STATUS_send_error;
         };
         case 0: {
-            printinfo1("Client closed connection");
+            printwarn1("Client closed connection");
             return STATUS_client_close;
         }
     }
@@ -243,7 +244,7 @@ void MSGStartAction(HASHLIST *list, char *package) {
 login_end:
     size_t RBXClientIdx = RBXClientFind(*tokenstr);
     if (RBXClientIdx == INVALID_TOKEN) {
-        printwarn1("Unathorized request attempt\n");
+        printwarn1("Unathorized request attempt");
         HTTPRESPONSE(package, ERR_INVALID_CLIENT);
         return;
     }
@@ -251,7 +252,6 @@ login_end:
     client->lrqst = time(0); // update last request time
 
     if (istype("DATAEX")) {
-        HTTPRESPONSE(package, OK_SUCCESS);
         // indexing instances
         HASHSTRVAL *instancesobj; 
         HashIndexing(list, "INSTANCES", instancesobj);
@@ -272,11 +272,13 @@ login_end:
             RBXCLIENT curclient = RBXClients.buff[i];
             STRVAL name = STRVALObj(curclient.name, 0);
             if (name.p == NULL) continue;
+            if (strcmp(curclient.token, client->token) == 0) continue;
 
+            RBXCLIENTDAT tempdat = curclient.tempdat;
+            if (tempdat.instances == NULL) continue;
             name.len = strlen(name.p);
             HASHLIST clientdat = {0};
             HashListRealloc(&clientdat, HASHLIST_STARTSIZE);
-            RBXCLIENTDAT tempdat = curclient.tempdat;
             STRVAL keys[1] = {STRConst("INSTANCES")};
             STRVAL instanceskey = keys[0];
             size_t instanceslen = strlen(tempdat.instances)+1;
@@ -288,7 +290,6 @@ login_end:
 
             char *msgform = MSGDecode(&clientdat, keys, sizeof(keys)/sizeof(STRVAL));
             TYPEOBJECT msgobj = TYPEObj(msgform, DT_LIST);
-            printf("a");
             HashSetVal(&clientsdat, name, msgobj);
             namekeys.buff[namekeys.len] = name;
             namekeys.len++;
