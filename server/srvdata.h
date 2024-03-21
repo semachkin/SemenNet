@@ -161,12 +161,12 @@ enum datatype {
 #define printwarnform "========== WARNING at %02lld:%02lld ==========\n"
 #define printfoot fclose(lf);
 
-#define printinfo1(f) if printinfocond { printhead fprintf(lf, printinfoform f "\n", printdifftime); printfoot }
-#define printinfo2(f, a0) if printinfocond { printhead fprintf(lf, printinfoform f "\n", printdifftime, a0); printfoot }
-#define printinfo3(f, a0, a1) if printinfocond { printhead fprintf(lf, printinfoform f "\n", printdifftime, a0, a1); printfoot }
+#define printinfo1(f) if printinfocond { printhead fprintf(lf, printinfoform f "\n", printdifftime); printf(f "\n"); printfoot }
+#define printinfo2(f, a0) if printinfocond { printhead fprintf(lf, printinfoform f "\n", printdifftime, a0); printf(f "\n", a0); printfoot }
+#define printinfo3(f, a0, a1) if printinfocond { printhead fprintf(lf, printinfoform f "\n", printdifftime, a0, a1); printf(f "\n", a0, a1); printfoot }
 
-#define printwarn1(f) if printwarncond { printhead fprintf(lf, printwarnform f "\n", printdifftime); printfoot }
-#define printwarn2(f, a0) if printwarncond { printhead fprintf(lf, printwarnform f "\n", printdifftime, a0); printfoot }
+#define printwarn1(f) if printwarncond { printhead fprintf(lf, printwarnform f "\n", printdifftime); printf(f "\n"); printfoot }
+#define printwarn2(f, a0) if printwarncond { printhead fprintf(lf, printwarnform f "\n", printdifftime, a0); printf(f "\n", a0); printfoot }
 
 #define cast(a, t) ((t)(a))
 

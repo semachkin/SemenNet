@@ -26,16 +26,12 @@ void HashListRealloc(HASHLIST *list, uint16_t newsize) {
     list->size = newsize;
 }
 
-InlineApi uint16_t hashfunc(STRVAL str) {
-    uint16_t hash;
-    for (uint16_t l = 0; l < str.len; l++)
-        hash ^= hash + cast(str.p[l], BYTE);
-    return hash;
-}
+#define hashfunc(k, str) \
+    k = 0; \
+    for (uint16_t l = 0; l < str.len; l++) k ^= k + cast(str.p[l], BYTE);
 
 HASHSTRVAL *HashGet(HASHLIST *list, STRVAL key) {
-    uint16_t hash = hashfunc(key);
-    printf("%x; ", hash);
+    uint16_t hash; hashfunc(hash, key);
     for (HASHSTRVAL *v = list->buff[hash & (list->size-1)]; v != NULL;) {
         if (v->hash == hash) return v;
         v = v->last;
@@ -58,7 +54,7 @@ void HashSetVal(HASHLIST *list, STRVAL key, TYPEOBJECT val) {
         hashval->obj = val;
         return;
     }
-    uint16_t hash = hashfunc(key);
+    uint16_t hash; hashfunc(hash, key);
     HASHSTRVAL *obj = newHashVal(list, val, hash);
     if (list->size == MAX_HASHLIST_SIZE)
         return;

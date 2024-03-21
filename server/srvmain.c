@@ -77,7 +77,6 @@ int main(void) {
             if (llen < DEFAULT_LOG_LEN) {
                 lbuff[llen] = lcur;
                 llen++;
-                printf("Client %d added\n", llen);
             }
             else {
                 printwarn1("Server full.. request rejected\n");
@@ -264,9 +263,9 @@ login_end:
         instancesdump[instancesstr->len] = Sf;
         client->tempdat.instances = instancesdump;
         
-        HASHLIST clientsdat = {0};
+        HASHLIST responsedat = {0};
         TBuff(STRVAL, DEFAULT_LOG_LEN) namekeys = {0};
-        HashListRealloc(&clientsdat, HASHLIST_STARTSIZE);
+        HashListRealloc(&responsedat, HASHLIST_STARTSIZE);
         
         for (size_t i = 0; i < DEFAULT_LOG_LEN; i++) {
             RBXCLIENT curclient = RBXClients.buff[i];
@@ -290,18 +289,18 @@ login_end:
 
             char *msgform = MSGDecode(&clientdat, keys, sizeof(keys)/sizeof(STRVAL));
             TYPEOBJECT msgobj = TYPEObj(msgform, DT_LIST);
-            HashSetVal(&clientsdat, name, msgobj);
+            HashSetVal(&responsedat, name, msgobj);
             namekeys.buff[namekeys.len] = name;
             namekeys.len++;
             HashListClean(&clientdat);
         }
-        char *msgpackage = MSGDecode(&clientsdat, namekeys.buff, namekeys.len);
-        HashListClean(&clientsdat);
+        char *msgpackage = MSGDecode(&responsedat, namekeys.buff, namekeys.len);
+        HashListClean(&responsedat);
         HTTPRESPONSE(package, msgpackage);
         free(msgpackage);
     }
 
-    system("cls");
+    //system("cls");
     #undef istype
     return;
 
