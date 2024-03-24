@@ -127,6 +127,7 @@ char *MSGDecode(HASHLIST *list, STRVAL *keys, size_t keysc) {
         STRVAL key = keys[i];
         HASHSTRVAL *val = HashGet(list, key);
         if (val == NULL) continue; 
+        if (val->obj.data == NULL) continue;
         memcpy(cur, key.p, key.len);
         cur += key.len;
         blen += key.len;

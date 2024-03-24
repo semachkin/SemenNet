@@ -44,7 +44,7 @@ int main(void) {
     // sockets options
     BOOL reuse_val = TRUE;
     DWORD rcvtimeo_val = 1000;
-    TIMEVAL seltimeo = {0, 10000};
+    TIMEVAL seltimeo = {0, 100};
 
     WSAAssert(SOCKOpt(serversock, SOL_SOCKET, SO_REUSEADDR, (char*)&reuse_val, sizeof(BOOL)), ==SOCKET_ERROR);
     WSAAssert(SOCKBind(serversock, (const PSOCKADDR)&serverdat, socklen), ==SOCKET_ERROR);
@@ -252,16 +252,24 @@ login_end:
 
     if (istype("DATAEX")) {
         // indexing instances
-        HASHSTRVAL *instancesobj; 
-        HashIndexing(list, "INSTANCES", instancesobj);
+        HASHSTRVAL *instancesobj; HashIndexing(list, "INSTANCES", instancesobj);
         if (instancesobj == NULL) goto incorrect_message;
         STRVAL *instancesstr = cast(instancesobj->obj.data, STRVAL*);
 
         MEMFree(client->tempdat.instances);
-        char *instancesdump = ARRAlloc(char, instancesstr->len + 1);
-        memcpy(instancesdump, instancesstr->p, instancesstr->len);
-        instancesdump[instancesstr->len] = Sf;
+
+        char *instancesdump; STRPrint(instancesdump, (*instancesstr));
         client->tempdat.instances = instancesdump;
+
+        // indexing messages
+        HASHSTRVAL *messagesobj; HashIndexing(list, "MESSAGES", messagesobj);
+        if (messagesobj != NULL) {
+            STRVAL *messagesstr = cast(messagesobj->obj.data, STRVAL*);
+            MEMFree(client->tempdat.messages);
+
+            char *messagesdump; STRPrint(messagesdump, (*messagesstr));
+            client->tempdat.messages = messagesdump;
+        }
         
         HASHLIST responsedat = {0};
         TBuff(STRVAL, DEFAULT_LOG_LEN) namekeys = {0};
@@ -278,14 +286,25 @@ login_end:
             name.len = strlen(name.p);
             HASHLIST clientdat = {0};
             HashListRealloc(&clientdat, HASHLIST_STARTSIZE);
-            STRVAL keys[1] = {STRConst("INSTANCES")};
+            STRVAL keys[2] = {STRConst("INSTANCES"), STRConst("MESSAGES")};
+
             STRVAL instanceskey = keys[0];
-            size_t instanceslen = strlen(tempdat.instances)+1;
+            STRVAL messageskey = keys[1];
+
             STRVAL *instances = ARRAlloc(STRVAL, 1);
             instances->p = tempdat.instances;
-            instances->len = instanceslen;
+            instances->len = strlen(tempdat.instances);
             TYPEOBJECT instancesobj = TYPEObj(instances, DT_STRING);
             HashSetVal(&clientdat, instanceskey, instancesobj);
+
+            TYPEOBJECT messagestobj = TYPEObj(NULL, DT_NULL);
+            if (tempdat.messages != NULL) {
+                STRVAL *messages = ARRAlloc(STRVAL, 1);
+                messages->p = tempdat.messages;
+                messages->len = strlen(tempdat.messages)+1;
+                messagestobj = TYPEObj(messages, DT_STRING);
+            }
+            HashSetVal(&clientdat, messageskey, messagestobj);
 
             char *msgform = MSGDecode(&clientdat, keys, sizeof(keys)/sizeof(STRVAL));
             TYPEOBJECT msgobj = TYPEObj(msgform, DT_LIST);
@@ -300,7 +319,6 @@ login_end:
         free(msgpackage);
     }
 
-    //system("cls");
     #undef istype
     return;
 

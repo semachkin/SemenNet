@@ -69,6 +69,7 @@ typedef struct TYPEOBJECT_S {
 
 typedef struct RBXCLIENTDAT_S {
     char *instances;
+    char *messages;
 } RBXCLIENTDAT;
 
 typedef struct RBXCLIENT_S {
@@ -178,10 +179,14 @@ enum datatype {
         if (RBXClients.buff[i].token == NULL) \
             { RBXClients.buff[i] = c; RBXClients.len++; break; }
 
+#define RBXClientCleanTempdat(d) \
+    MEMFree(d.instances); \
+    MEMFree(d.messages)
+
 #define RBXClientClean(c) \
     free(c.name); \
     free(c.token); \
-    MEMFree(c.tempdat.instances)
+    RBXClientCleanTempdat(c.tempdat)
 
 #define SOCKDInit(d, port) \
     d.sin_family = AF_INET; \
