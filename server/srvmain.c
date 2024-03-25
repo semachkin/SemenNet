@@ -279,7 +279,7 @@ login_end:
             RBXCLIENT curclient = RBXClients.buff[i];
             STRVAL name = STRVALObj(curclient.name, 0);
             if (name.p == NULL) continue;
-            //if (strcmp(curclient.token, client->token) == 0) continue;
+            if (strcmp(curclient.token, client->token) == 0) continue;
 
             RBXCLIENTDAT tempdat = curclient.tempdat;
             if (tempdat.instances == NULL) continue;
