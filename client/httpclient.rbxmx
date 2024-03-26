@@ -2,7 +2,7 @@
 	<Meta name="ExplicitAutoJoints">true</Meta>
 	<External>null</External>
 	<External>nil</External>
-	<Item class="Actor" referent="RBX34B31CB1F24D48539E2564039F397A49">
+	<Item class="Actor" referent="RBX32B157F995C745FBA1F140C487A68888">
 		<Properties>
 			<BinaryString name="AttributesSerialize"></BinaryString>
 			<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -37,7 +37,7 @@
 			<BinaryString name="Tags"></BinaryString>
 			<OptionalCoordinateFrame name="WorldPivotData"></OptionalCoordinateFrame>
 		</Properties>
-		<Item class="Script" referent="RBXBFB0FA5733204EA28D6B4CF874B99408">
+		<Item class="Script" referent="RBXC62B585222124C26B53DF3285A728841">
 			<Properties>
 				<BinaryString name="AttributesSerialize"></BinaryString>
 				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -128,7 +128,7 @@ local chatManager = require(managers.ChatManager)
 				<int64 name="SourceAssetId">-1</int64>
 				<BinaryString name="Tags"></BinaryString>
 			</Properties>
-			<Item class="Folder" referent="RBXB5384E27C5334305B367F1D28BC8FF92">
+			<Item class="Folder" referent="RBX868FE6623D72476F9DCCCEEE17F0C538">
 				<Properties>
 					<BinaryString name="AttributesSerialize"></BinaryString>
 					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -137,7 +137,7 @@ local chatManager = require(managers.ChatManager)
 					<int64 name="SourceAssetId">-1</int64>
 					<BinaryString name="Tags"></BinaryString>
 				</Properties>
-				<Item class="ModuleScript" referent="RBX616E0CFFEA204B2F8253ECA3A52EF7F0">
+				<Item class="ModuleScript" referent="RBX2E340191EAE44CDFAFDAA5E30ADC27BA">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -148,7 +148,10 @@ local chatManager = require(managers.ChatManager)
 						<ProtectedString name="Source"><![CDATA[local httpService = game:GetService'HttpService'
 local players = game:GetService'Players'
 
-local services = script.Parent
+local master = script.Parent.Parent
+
+local services = master.services
+local serverConfig = master.SERVER_CONFIG
 
 local messageSerializer: messageSerializer.constructor = require(services.MessageSerializer)
 local clientInstances: clientInstances.constructor = require(services.ClientInstances)
@@ -185,7 +188,7 @@ type server = {
 	GenerateToken: (self: server) -> string;
 	
 	Login: (self: server) -> boolean;
-	DataExchange: (self: server) -> boolean;
+	DataExchange: (self: server) -> (string, string)?;
 	Post: (self: server, message: string) -> (boolean, string);
 }
 type serverConstructor = (conf: serverConfiguration) -> server
@@ -198,6 +201,8 @@ export type constructor = serverConstructor
 if shared.serverConstructor then
 	return shared.serverConstructor :: serverConstructor
 end
+
+local exchangeInfoFormat = serverConfig:GetAttribute'exchangeInfoFormat'
 
 local __server: serverConstructor = function(conf)
 	local server: server = {}
@@ -257,9 +262,18 @@ local __server: serverConstructor = function(conf)
 	
 	local function fullSerialize(list)
 		list = messageSerializerService:Serialize(list)
+		local realsize = #list
 		list = zlibcompression.Compress(list)
 		list = messageSerializerService:ReplaceAttributeChars(list)
-		return list
+		return list, realsize
+	end
+	
+	local function getListLen(list)
+		local count = 0
+		for _ in next, list do
+			count += 1
+		end
+		return count
 	end
 	
 	function server:Login()
@@ -272,8 +286,17 @@ local __server: serverConstructor = function(conf)
 		local instances = clientdata.INSTANCES
 		local messages = clientdata.MESSAGES
 		
-		clientdata.INSTANCES = fullSerialize(instances)
-		clientdata.MESSAGES = next(messages) and fullSerialize(messages) or nil
+		local instancesCount, instancesRealSize = getListLen(instances)
+		clientdata.INSTANCES, instancesRealSize = fullSerialize(instances)
+		local instancesSize = #clientdata.INSTANCES
+		
+		local messagesCount, messagesRealSize, messagesSize = getListLen(messages)
+		if next(messages) then
+			clientdata.MESSAGES, messagesRealSize = fullSerialize(messages)
+			messagesSize = #clientdata.MESSAGES
+		else 
+			clientdata.MESSAGES, messagesRealSize, messagesSize = nil, 0, 0
+		end
 		
 		local message = messageSerializerService:Serialize(clientdata)
 		
@@ -284,7 +307,12 @@ local __server: serverConstructor = function(conf)
 		
 		if result then
 			chatService:clearBuff()
-			return response
+			
+			local exchangeInfo = exchangeInfoFormat:pack(
+				instancesCount, instancesSize, instancesRealSize,
+				messagesCount, messagesSize, messagesRealSize
+			)
+			return response, exchangeInfo
 		end
 	end
 	
@@ -298,7 +326,7 @@ return __server]]></ProtectedString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="ModuleScript" referent="RBX0E148BFD75E64646B2568FEEA1378BA1">
+				<Item class="ModuleScript" referent="RBXF4CFD0A23F0D4D3C900D0316A70C8C16">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -542,7 +570,7 @@ return __messageSerializer]]></ProtectedString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="ModuleScript" referent="RBX77A46FE909A944D2AAE91D2FC73BD206">
+				<Item class="ModuleScript" referent="RBX665F518B3D5D4453AC92C72728A97271">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -806,7 +834,7 @@ return __clientInstances]]></ProtectedString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="ModuleScript" referent="RBXD74B18742FC3439B8589985AD77A5192">
+				<Item class="ModuleScript" referent="RBXFCB6E63F90CE4466B7365A4026884B5B">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -887,10 +915,11 @@ return __chatMessages]]></ProtectedString>
 					</Properties>
 				</Item>
 			</Item>
-			<Item class="Configuration" referent="RBXE61FDF2EAA7C46B1BF5D66C3E168EDDB">
+			<Item class="Configuration" referent="RBX6A68308EA67B4B3A9601291D2F2F4311">
 				<Properties>
-					<BinaryString name="AttributesSerialize"><![CDATA[AwAAAA0AAABleGNoYW5nZV9yYXRlBpqZmZmZmSBABAAAAHBvcnQCBAAAADE5MTcOAAAAcHJp
-dmF0ZV9uZXRfaXACDAAAADE5Mi4xNjguMS4xNQ==]]></BinaryString>
+					<BinaryString name="AttributesSerialize"><![CDATA[BAAAABIAAABleGNoYW5nZUluZm9Gb3JtYXQCCAAAADxITEx4SExMDQAAAGV4Y2hhbmdlX3Jh
+dGUGmpmZmZmZIEAEAAAAcG9ydAIEAAAAMTkxNw4AAABwcml2YXRlX25ldF9pcAIMAAAAMTky
+LjE2OC4xLjE1]]></BinaryString>
 					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
 					<bool name="DefinesCapabilities">false</bool>
 					<string name="Name">SERVER_CONFIG</string>
@@ -898,7 +927,7 @@ dmF0ZV9uZXRfaXACDAAAADE5Mi4xNjguMS4xNQ==]]></BinaryString>
 					<BinaryString name="Tags"></BinaryString>
 				</Properties>
 			</Item>
-			<Item class="Folder" referent="RBX2AE02DC28B2140D788AF9420E0CFD365">
+			<Item class="Folder" referent="RBXC379519DE64C4C389D93CD496F6B6D48">
 				<Properties>
 					<BinaryString name="AttributesSerialize"></BinaryString>
 					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -907,7 +936,7 @@ dmF0ZV9uZXRfaXACDAAAADE5Mi4xNjguMS4xNQ==]]></BinaryString>
 					<int64 name="SourceAssetId">-1</int64>
 					<BinaryString name="Tags"></BinaryString>
 				</Properties>
-				<Item class="ModuleScript" referent="RBXEB626C161F3043FEB8167084FFACC0D4">
+				<Item class="ModuleScript" referent="RBX98AF588F979740A7BBC169D294E51255">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -920,7 +949,8 @@ local players = game:GetService'Players'
 
 local master = script.Parent.Parent
 
-local services =  master.services
+local services = master.services
+local serverConfig = master.SERVER_CONFIG
 
 local server: server.constructor = require(services.Server)
 local clientInstances: clientInstances.constructor = require(services.ClientInstances)
@@ -928,6 +958,10 @@ local messageSerializer: messageSerializer.constructor = require(services.Messag
 local chatMessages: chatMessages.constructor = require(services.ChatMessages)
 
 local clientsSocket = replicatedStorage.ClientsSocket
+local socketConfig = clientsSocket.SOCKET_CONFIG
+
+local networkStatsFormat = socketConfig:GetAttribute'networkStatsFormat'
+local exchangeInfoFormat = serverConfig:GetAttribute'exchangeInfoFormat'
 
 local function main()
 	local serverService: server.object = shared.GetService'Server'
@@ -937,11 +971,12 @@ local function main()
 	
 	local serverConfig = shared.serverConfig
 	local tools = shared.tools
+	local events = shared.events
 	
 	local zlibcompression = tools.zlib
 	
 	--[[ LOGIN ]]--
-	warn(('='):rep(12))
+	warn(('='):rep(30))
 	local logInResult = serverService:Login()
 	if not logInResult then 
 		return warn'LOGIN FAILED' 
@@ -1016,12 +1051,30 @@ local function main()
 	local requestThread = task.spawn(function()
 		local updateTime = 1/serverConfig.exchange_rate
 		
+		local alpha = tick()
 		while task.wait(updateTime) do
-			local serverInfo = serverService:DataExchange()
+			local serverInfo, exchangeInfo = serverService:DataExchange()
+			
 			if not serverInfo then
 				warn'packet lost...'
 				continue
 			end
+			
+			local exchangeData = {exchangeInfoFormat:unpack(exchangeInfo)}
+			
+			local delta = tick() - alpha
+			
+			local ping = delta * 1000
+			local instancesCount, instancesSize, instancesRealSize = unpack(exchangeData)
+			local messagesLen, messagesSize, messagesRealSize = select(4, unpack(exchangeData))
+			
+			local netStats = networkStatsFormat:pack(
+				ping, 
+				instancesCount, instancesSize, instancesRealSize,
+				messagesLen, messagesSize, messagesRealSize
+			)
+			clientsSocket.statsRefresh:FireClient(serverService.client, netStats)
+			
 			local deserialized = serializerService:Deserialize(serverInfo)
 
 			local clients = {}
@@ -1052,6 +1105,8 @@ local function main()
 			
 			clientsSocket.clientsRefresh:FireClient(serverService.client, clients)
 			refreshPlayers(clients)
+			
+			alpha = tick()
 		end
 	end)
 	
@@ -1063,7 +1118,7 @@ return main]]></ProtectedString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="ModuleScript" referent="RBXA4F647E9ACCE4D1D84119729DBB00C0F">
+				<Item class="ModuleScript" referent="RBXD7BEC2763E2F46A995FAD07745C9306E">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -1134,7 +1189,7 @@ return main]]></ProtectedString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="ModuleScript" referent="RBXD503B14F20204968AFDD0EEFCB8BD297">
+				<Item class="ModuleScript" referent="RBXCFCBA9E7012A4499A03231A54F6AC538">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -1178,7 +1233,7 @@ return main]]></ProtectedString>
 					</Properties>
 				</Item>
 			</Item>
-			<Item class="Folder" referent="RBX49D0F178A2C7462D86373B00A63B6ACE">
+			<Item class="Folder" referent="RBXB24210D9C4EC4677B4C647829648E2D3">
 				<Properties>
 					<BinaryString name="AttributesSerialize"></BinaryString>
 					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -1187,7 +1242,7 @@ return main]]></ProtectedString>
 					<int64 name="SourceAssetId">-1</int64>
 					<BinaryString name="Tags"></BinaryString>
 				</Properties>
-				<Item class="ModuleScript" referent="RBX8E649C1EB2274813840432B487FCCC00">
+				<Item class="ModuleScript" referent="RBX30A4452A682A428989B2383A98E4E073">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -4611,7 +4666,7 @@ return Compression]]></ProtectedString>
 					</Properties>
 				</Item>
 			</Item>
-			<Item class="Folder" referent="RBXE76F8BF24CF44CC88B391A4305B4B2F7">
+			<Item class="Folder" referent="RBX2D382413CB9742EEAD51AD265D6F0C81">
 				<Properties>
 					<BinaryString name="AttributesSerialize"></BinaryString>
 					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -4620,7 +4675,7 @@ return Compression]]></ProtectedString>
 					<int64 name="SourceAssetId">-1</int64>
 					<BinaryString name="Tags"></BinaryString>
 				</Properties>
-				<Item class="ModuleScript" referent="RBX5821441C065E434E888BEBD157FD691B">
+				<Item class="ModuleScript" referent="RBXCFF8D706E8B54A02A41DAD90EE53080E">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -4717,7 +4772,7 @@ return event]]></ProtectedString>
 						<int64 name="SourceAssetId">-1</int64>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
-					<Item class="ModuleScript" referent="RBX34CD0952DCBE473DA3A1CA1B85217967">
+					<Item class="ModuleScript" referent="RBX75494E8A16E44F0E97239A8885805591">
 						<Properties>
 							<BinaryString name="AttributesSerialize"></BinaryString>
 							<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>

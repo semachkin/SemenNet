@@ -2,7 +2,7 @@
 	<Meta name="ExplicitAutoJoints">true</Meta>
 	<External>null</External>
 	<External>nil</External>
-	<Item class="Folder" referent="RBX0CAB63F332A541CDB6EF0720E118C119">
+	<Item class="Folder" referent="RBXC6DFA3C773C84611900F692D3B7EEBA3">
 		<Properties>
 			<BinaryString name="AttributesSerialize"></BinaryString>
 			<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -11,7 +11,7 @@
 			<int64 name="SourceAssetId">-1</int64>
 			<BinaryString name="Tags"></BinaryString>
 		</Properties>
-		<Item class="RemoteEvent" referent="RBX34AD2591CEE947E48183A5B2B6A3830B">
+		<Item class="RemoteEvent" referent="RBX45BCC10880A2439392DE9D5116DB16D6">
 			<Properties>
 				<BinaryString name="AttributesSerialize"></BinaryString>
 				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -21,12 +21,33 @@
 				<BinaryString name="Tags"></BinaryString>
 			</Properties>
 		</Item>
-		<Item class="RemoteEvent" referent="RBXD3C7898FE81644A1BF9027636C21F145">
+		<Item class="RemoteEvent" referent="RBX2C96B9E8A68E45A7AE1FCDA2EC6B94F3">
 			<Properties>
 				<BinaryString name="AttributesSerialize"></BinaryString>
 				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
 				<bool name="DefinesCapabilities">false</bool>
 				<string name="Name">clientsRefresh</string>
+				<int64 name="SourceAssetId">-1</int64>
+				<BinaryString name="Tags"></BinaryString>
+			</Properties>
+		</Item>
+		<Item class="RemoteEvent" referent="RBX3744232BD60E47CEBDA9EEEF0B3C6FC6">
+			<Properties>
+				<BinaryString name="AttributesSerialize"></BinaryString>
+				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+				<bool name="DefinesCapabilities">false</bool>
+				<string name="Name">statsRefresh</string>
+				<int64 name="SourceAssetId">-1</int64>
+				<BinaryString name="Tags"></BinaryString>
+			</Properties>
+		</Item>
+		<Item class="Configuration" referent="RBXC99E441857724C898EDBB151C2E8F19A">
+			<Properties>
+				<BinaryString name="AttributesSerialize"><![CDATA[AgAAAAMAAABNVFUGAAAAAAAAxEASAAAAbmV0d29ya1N0YXRzRm9ybWF0AgoAAAA8SHhITEx4
+SExM]]></BinaryString>
+				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+				<bool name="DefinesCapabilities">false</bool>
+				<string name="Name">SOCKET_CONFIG</string>
 				<int64 name="SourceAssetId">-1</int64>
 				<BinaryString name="Tags"></BinaryString>
 			</Properties>
