@@ -72,7 +72,7 @@ int main(void) {
         WSAAssert(selres = SOCKSel(0, &clientsdat, NULL, NULL, &seltimeo), ==SOCKET_ERROR);
         if (selres > 0) {
             WSAAssert(lcur = SOCKAccept(serversock, (const PSOCKADDR)&tempdat, (int*)&socklen), ==INVALID_SOCKET || (lcur ==SOCKET_ERROR));
-            printinfo3("Connected to %s:%d", SINIP(tempdat.sin_addr), SINPORT(tempdat.sin_port));
+            //printinfo3("Connected to %s:%d", SINIP(tempdat.sin_addr), SINPORT(tempdat.sin_port));
 
             if (llen < DEFAULT_LOG_LEN) {
                 lbuff[llen] = lcur;
@@ -118,7 +118,7 @@ int main(void) {
 
 remove_sock:
             WSAAssert(SOCKGetName(lcur, (const PSOCKADDR)&tempdat, (int*)&socklen), ==SOCKET_ERROR);
-            printinfo3("Disconnect at %s:%d", SINIP(tempdat.sin_addr), SINPORT(tempdat.sin_port));
+            //printinfo3("Disconnect at %s:%d", SINIP(tempdat.sin_addr), SINPORT(tempdat.sin_port));
             SOCKClose(lcur);
             lbuff[i] = 0;
             LISTAlign(clientslist);
