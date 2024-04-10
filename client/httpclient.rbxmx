@@ -2,7 +2,7 @@
 	<Meta name="ExplicitAutoJoints">true</Meta>
 	<External>null</External>
 	<External>nil</External>
-	<Item class="Actor" referent="RBXDC7AC5B0C546403DB733E609F976F3DE">
+	<Item class="Actor" referent="RBXCE005E4134A84462BC98492D89D78CFB">
 		<Properties>
 			<BinaryString name="AttributesSerialize"></BinaryString>
 			<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -37,7 +37,7 @@
 			<BinaryString name="Tags"></BinaryString>
 			<OptionalCoordinateFrame name="WorldPivotData"></OptionalCoordinateFrame>
 		</Properties>
-		<Item class="Script" referent="RBX1646C44169E7423681C6EFCE360BF25D">
+		<Item class="Script" referent="RBX172C5B25C52A4A5DAE9470EDE9C4D833">
 			<Properties>
 				<BinaryString name="AttributesSerialize"></BinaryString>
 				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -137,7 +137,7 @@ local chatManager = require(managers.ChatManager)
 				<int64 name="SourceAssetId">-1</int64>
 				<BinaryString name="Tags"></BinaryString>
 			</Properties>
-			<Item class="Folder" referent="RBX7C7A8631E2E04D828C21D138E7A41109">
+			<Item class="Folder" referent="RBX7AD03BA608814CCEA203E57D7939661A">
 				<Properties>
 					<BinaryString name="AttributesSerialize"></BinaryString>
 					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -146,7 +146,7 @@ local chatManager = require(managers.ChatManager)
 					<int64 name="SourceAssetId">-1</int64>
 					<BinaryString name="Tags"></BinaryString>
 				</Properties>
-				<Item class="ModuleScript" referent="RBX5F02A8A939FF4244AC7844E4DDDFA2F2">
+				<Item class="ModuleScript" referent="RBXBA07EFE99C7C4D64A537C01782D8882B">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -335,7 +335,7 @@ return __server]]></ProtectedString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="ModuleScript" referent="RBX0ED42FD47297473A8B4E5D39B5867C3F">
+				<Item class="ModuleScript" referent="RBXFF5F428DC3B34510BA10EB48E26A23FB">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -390,6 +390,9 @@ local propertiesWhitelist = {
 	};
 	FileMesh = {
 		'MeshType', 'Scale', 'TextureId', 'MeshId';
+	};
+	MeshPart = {
+		'MeshId';
 	};
 	Model = {
 		'PrimaryPart';
@@ -562,7 +565,6 @@ local __messageSerializer: messageSerializerConstructor = function()
 
 					result.PS[p] = propertie
 				end
-				break
 			end
 		end
 		
@@ -579,7 +581,7 @@ return __messageSerializer]]></ProtectedString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="ModuleScript" referent="RBXAEBA64303C634D04AAD462712FD8DF38">
+				<Item class="ModuleScript" referent="RBXE0A63E900F5D4708913A622D4C4FA5D7">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -633,6 +635,12 @@ local replicationWhitelist = {
 	'CharacterMesh';
 	'Pants', 'Shirt';
 	'Accessory';
+}
+local preloadedAssetsClassesList = {
+	MeshPart = true;
+}
+local immutableProperties = {
+	MeshId = 'MeshPart';
 }
 
 local __clientInstances: clientInstancesConstructor = function()
@@ -689,6 +697,17 @@ local __clientInstances: clientInstancesConstructor = function()
 		local uid = self.getInstanceUID(instance)
 		if not uid then return end
 		return `{instance}{UIDforamt:format(uid)}`
+	end
+	
+	local preloadedAsssetsList = {}
+	
+	for _,v in next, game:GetDescendants() do -- TODO: find preloaded assets
+		local class = v.ClassName
+		if preloadedAssetsClassesList[class] then
+			if class == 'MeshPart' then
+				preloadedAsssetsList[v.MeshId] = v
+			end
+		end
 	end
 	
 	local function getInstancesListLen(list)
@@ -780,12 +799,24 @@ local __clientInstances: clientInstancesConstructor = function()
 				local instance: Instance = findChild(parent, name, uid)
 				
 				if not instance then
-					instance = Instance.new(classname)
+					local load = true
+					-- TODO: presets
+					if classname == 'MeshPart' then
+						local meshId = properties.MeshId.V
+						instance = preloadedAsssetsList[meshId]
+						if instance then
+							instance = instance:Clone()
+						end
+						load = not instance
+					end
+					if load then
+						instance = Instance.new(classname)
+					end
 					instance:SetAttribute('UID', uid)
 					instance.Name = name
 					instance.Parent = parent
 
-					-- TODO: presets
+					-- TODO: aftersets
 					if instance:IsA'BasePart' then
 						instance.CanCollide = false
 						instance.Anchored = true
@@ -796,13 +827,18 @@ local __clientInstances: clientInstancesConstructor = function()
 					local rbxtype = pack.T
 					local value = pack.V
 					
+					-- TODO: check immutable
+					if classname == immutableProperties[propertie] then
+						continue
+					end
+					
 					local function set()
 						instance[propertie] = value
 					end
-					local result = pcall(set)
+					local result, err = pcall(set)
 					if not result then
 						value = convertValue(value, rbxtype, clientSpace)
-						result = pcall(set)
+						result, err = pcall(set)
 						-- TODO: extra instances stack
 						if rbxtype == 'Instance' and not value then
 							local stackInfo = {}
@@ -810,9 +846,10 @@ local __clientInstances: clientInstancesConstructor = function()
 							stackInfo.parent = instance
 							stackInfo.value = pack.V
 							table.insert(instancesStack, 1, stackInfo)
+							continue
 						end
 						if not result then
-							warn(`unknown properties {propertie} in {classname}`)
+							warn(`unknown properties {propertie} in {classname}\m more details: {err}`)
 						end
 					end
 				end
@@ -843,7 +880,7 @@ return __clientInstances]]></ProtectedString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="ModuleScript" referent="RBX22B7CAD23CD74BD1B602C59A247A24AD">
+				<Item class="ModuleScript" referent="RBXCB681AA376D64CA3AEC0931FBD43F3DE">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -924,7 +961,7 @@ return __chatMessages]]></ProtectedString>
 					</Properties>
 				</Item>
 			</Item>
-			<Item class="Folder" referent="RBX786DD42D625B4C7DBDBE00E53509A1C6">
+			<Item class="Folder" referent="RBXD42768E6B9CD4C629E0265B25E8EABF0">
 				<Properties>
 					<BinaryString name="AttributesSerialize"></BinaryString>
 					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -933,7 +970,7 @@ return __chatMessages]]></ProtectedString>
 					<int64 name="SourceAssetId">-1</int64>
 					<BinaryString name="Tags"></BinaryString>
 				</Properties>
-				<Item class="ModuleScript" referent="RBX3F0EBCCF1ED248829658D039141F744B">
+				<Item class="ModuleScript" referent="RBX2A644A96756A466A890D65543700FCAF">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -1114,7 +1151,7 @@ return main]]></ProtectedString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="ModuleScript" referent="RBX6E5243FBF7324BE685EE8F09723EFD1B">
+				<Item class="ModuleScript" referent="RBXA5316A2C0CFC42FDA410CE1072711477">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -1185,7 +1222,7 @@ return main]]></ProtectedString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="ModuleScript" referent="RBX953B3A221F6740A09B2978D6B692D54A">
+				<Item class="ModuleScript" referent="RBX91C8DD7F90884DEAAACAAC27899DE0BF">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -1229,7 +1266,7 @@ return main]]></ProtectedString>
 					</Properties>
 				</Item>
 			</Item>
-			<Item class="Folder" referent="RBXAA2DE9189C7B4973BEC23DBFC933E617">
+			<Item class="Folder" referent="RBX40009ADEAB3E45AB8DAF4106EDD5147E">
 				<Properties>
 					<BinaryString name="AttributesSerialize"></BinaryString>
 					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -1238,7 +1275,7 @@ return main]]></ProtectedString>
 					<int64 name="SourceAssetId">-1</int64>
 					<BinaryString name="Tags"></BinaryString>
 				</Properties>
-				<Item class="ModuleScript" referent="RBXCE3DDACEEB44425290092B9FF8B151BB">
+				<Item class="ModuleScript" referent="RBX937104A962B94B9F8F3E72961A2AE80B">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -4662,7 +4699,7 @@ return Compression]]></ProtectedString>
 					</Properties>
 				</Item>
 			</Item>
-			<Item class="Folder" referent="RBXFB5798A1F2F946AEB984283D113EBD4B">
+			<Item class="Folder" referent="RBXDEE8960829184CD5BFFF2B58335F7CBB">
 				<Properties>
 					<BinaryString name="AttributesSerialize"></BinaryString>
 					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -4671,7 +4708,7 @@ return Compression]]></ProtectedString>
 					<int64 name="SourceAssetId">-1</int64>
 					<BinaryString name="Tags"></BinaryString>
 				</Properties>
-				<Item class="ModuleScript" referent="RBXCE45F09249D84199B9C02E6EE4E019C6">
+				<Item class="ModuleScript" referent="RBX31FE523AE65248AC8B972E4A8FF30871">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -4768,7 +4805,7 @@ return event]]></ProtectedString>
 						<int64 name="SourceAssetId">-1</int64>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
-					<Item class="ModuleScript" referent="RBXD4E497F1FA394D5EA444648ADCC3A64D">
+					<Item class="ModuleScript" referent="RBX85C6F9016E37418C9F447E50300B1DFD">
 						<Properties>
 							<BinaryString name="AttributesSerialize"></BinaryString>
 							<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -4826,7 +4863,7 @@ return signal]]></ProtectedString>
 				</Item>
 			</Item>
 		</Item>
-		<Item class="Configuration" referent="RBXADB6BFBA77D24FFB99BD56FE1A2D6E8C">
+		<Item class="Configuration" referent="RBXB87B817980934BC9AAE1C948CBFD4A0E">
 			<Properties>
 				<BinaryString name="AttributesSerialize"><![CDATA[BAAAABIAAABleGNoYW5nZUluZm9Gb3JtYXQCCAAAADxITEx4SExMDQAAAGV4Y2hhbmdlX3Jh
 dGUGmpmZmZmZIEAEAAAAcG9ydAIEAAAAMTkxNw4AAABwcml2YXRlX25ldF9pcAIMAAAAMTky
@@ -4838,7 +4875,7 @@ LjE2OC4xLjE1]]></BinaryString>
 				<BinaryString name="Tags"></BinaryString>
 			</Properties>
 		</Item>
-		<Item class="Folder" referent="RBXAEBB3F1104A448DE8DDC9A06519FB5FA">
+		<Item class="Folder" referent="RBX98C4C716015547D8BAA1318B19BB2247">
 			<Properties>
 				<BinaryString name="AttributesSerialize"></BinaryString>
 				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -4847,7 +4884,7 @@ LjE2OC4xLjE1]]></BinaryString>
 				<int64 name="SourceAssetId">-1</int64>
 				<BinaryString name="Tags"></BinaryString>
 			</Properties>
-			<Item class="Folder" referent="RBX525D343CE0FB47F389695139BCB6093B">
+			<Item class="Folder" referent="RBX2DAC33EA8A1F49BAB4DCCDC81E1D075C">
 				<Properties>
 					<BinaryString name="AttributesSerialize"></BinaryString>
 					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -4856,7 +4893,7 @@ LjE2OC4xLjE1]]></BinaryString>
 					<int64 name="SourceAssetId">-1</int64>
 					<BinaryString name="Tags"></BinaryString>
 				</Properties>
-				<Item class="RemoteEvent" referent="RBX9951EF50FA5C481DB01CF131AC32B5E5">
+				<Item class="RemoteEvent" referent="RBXD1761E0103BA48F9B316B14AA8F785B4">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -4866,7 +4903,7 @@ LjE2OC4xLjE1]]></BinaryString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="RemoteEvent" referent="RBXAC771168C2CC4113ADCABA009D2B5DA5">
+				<Item class="RemoteEvent" referent="RBX9DAAAD35A23E4E329EE109C6B8AF04B3">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -4876,7 +4913,7 @@ LjE2OC4xLjE1]]></BinaryString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="RemoteEvent" referent="RBX513D4CD16B714E829EE55C09C8892A56">
+				<Item class="RemoteEvent" referent="RBXE7321A1D70A64127A6CAFD082970E2E1">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -4886,7 +4923,7 @@ LjE2OC4xLjE1]]></BinaryString>
 						<BinaryString name="Tags"></BinaryString>
 					</Properties>
 				</Item>
-				<Item class="Configuration" referent="RBX103442D59E4D4863AD5C7CD54FCCBB3D">
+				<Item class="Configuration" referent="RBX1616622305CD4D00AE576F785394303E">
 					<Properties>
 						<BinaryString name="AttributesSerialize"><![CDATA[AgAAAAMAAABNVFUGAAAAAAAAxEASAAAAbmV0d29ya1N0YXRzRm9ybWF0AgoAAAA8SHhITEx4
 SExM]]></BinaryString>
