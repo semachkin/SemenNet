@@ -2,7 +2,7 @@
 	<Meta name="ExplicitAutoJoints">true</Meta>
 	<External>null</External>
 	<External>nil</External>
-	<Item class="Actor" referent="RBXFA6E43626E424F3BAC505BAAC19DF1C0">
+	<Item class="Actor" referent="RBX4ACFFD12746D4687B698E9F34AAF6241">
 		<Properties>
 			<BinaryString name="AttributesSerialize"></BinaryString>
 			<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -37,7 +37,7 @@
 			<BinaryString name="Tags"></BinaryString>
 			<OptionalCoordinateFrame name="WorldPivotData"></OptionalCoordinateFrame>
 		</Properties>
-		<Item class="LocalScript" referent="RBXEAA3FF6FD8AC4770A3F93718B9212743">
+		<Item class="LocalScript" referent="RBX0E42EB56C8D74038BD996CB51D6D5BCE">
 			<Properties>
 				<BinaryString name="AttributesSerialize"></BinaryString>
 				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -47,214 +47,26 @@
 				<string name="Name">master</string>
 				<token name="RunContext">0</token>
 				<string name="ScriptGuid">{D0B41585-5DF6-4609-82CD-10445A6E6314}</string>
-				<ProtectedString name="Source"><![CDATA[local init = script.init
+				<ProtectedString name="Source"><![CDATA[local rbxClient = script.Parent
 
---[[ INIT ]]--
-local initgui = require(init.InitGui)
+local CLIENT_CONFIG = rbxClient.CLIENT_CONFIG
 
---[[start]] initgui()]]></ProtectedString>
+local handlers = script.handlers
+
+shared.clientConfig = CLIENT_CONFIG:GetAttributes()
+
+do --[[ BUBBLE SPEECH HANDLER ]]--
+	shared.bubbleSpeechDecryptor = {}
+end
+
+--[[ GUI MANAGER ]]--
+local guiManager = require(handlers.guiManager)
+
+--[[start]] guiManager()]]></ProtectedString>
 				<int64 name="SourceAssetId">-1</int64>
 				<BinaryString name="Tags"></BinaryString>
 			</Properties>
-			<Item class="Folder" referent="RBX8368F3365C65409EAC3AEEF71A769046">
-				<Properties>
-					<BinaryString name="AttributesSerialize"></BinaryString>
-					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
-					<bool name="DefinesCapabilities">false</bool>
-					<string name="Name">init</string>
-					<int64 name="SourceAssetId">-1</int64>
-					<BinaryString name="Tags"></BinaryString>
-				</Properties>
-				<Item class="ModuleScript" referent="RBXEB66E89E29FC43B38BE08C4C1C0D4A84">
-					<Properties>
-						<BinaryString name="AttributesSerialize"></BinaryString>
-						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
-						<bool name="DefinesCapabilities">false</bool>
-						<Content name="LinkedSource"><null></null></Content>
-						<string name="Name">InitGui</string>
-						<string name="ScriptGuid">{5228E35F-D41C-44EA-85EB-B4C93F0C1C16}</string>
-						<ProtectedString name="Source"><![CDATA[local starterGui = game:GetService'StarterGui'
-local replicatedStorage = game:GetService'ReplicatedStorage'
---local contextAction = game:GetService'ContextActionService'
-local userInputServce = game:GetService'UserInputService'
-local players = game:GetService'Players'
-
-local master = script.Parent.Parent
-
-local source = master.source
-
-local clientsSocket = replicatedStorage:WaitForChild'ClientsSocket'
-local socketConfig = clientsSocket.SOCKET_CONFIG
-
-local serverMTU = socketConfig:GetAttribute'MTU'
-local networkStatsFormat = socketConfig:GetAttribute'networkStatsFormat'
-
-local client = players.LocalPlayer
-local clientGui = client.PlayerGui
-
-local function main()
-	
-	--[[ CORE GUI INIT ]]--
-	starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, false)
-	starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
-	starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Captures, false)
-	
-	--[[ MAIN GUI ]]--
-	local mainGui = source.maingui:Clone()
-	mainGui.Parent = clientGui
-	
-	local networkHealthComb = {
-		Enum.KeyCode.LeftControl, Enum.KeyCode.LeftShift, Enum.KeyCode.One
-	}
-	local leaderstatsComb = {
-		Enum.KeyCode.Tab
-	}
-
-	local keysBuffer = {}
-	local function checkKeysComb(comb)
-		for i,key in next, comb do
-			if keysBuffer[i] ~= key then return end
-		end
-		return true
-	end
-	
-	local nethealthActionFun
-	local leaderstatsAcitonFun
-	
-	userInputServce.InputBegan:Connect(function(input) 
-		if input.UserInputType ~= Enum.UserInputType.Keyboard then
-			return
-		end
-		table.insert(keysBuffer, input.KeyCode)
-		if checkKeysComb(networkHealthComb) then
-			nethealthActionFun()
-		elseif checkKeysComb(leaderstatsComb) then
-			leaderstatsAcitonFun()
-		end
-	end)
-	userInputServce.InputEnded:Connect(function(input) 
-		table.remove(keysBuffer, table.find(keysBuffer, input.KeyCode))
-	end)
-	
-	local clientsList = mainGui.clientslist do
-		local pattern = clientsList.pattern
-
-		local latest = {}
-
-		local function refresh(list) 
-			local listlen, latestlen = #list, #latest
-
-			if listlen > latestlen then
-				for _,client in next, list do
-					if table.find(latest, client) then continue end
-
-					local newcell = pattern:Clone()
-					newcell.Parent = clientsList
-					newcell.Name = client
-					newcell.Visible = true
-
-					newcell.name.Text = client
-
-					table.insert(latest, client)
-				end
-			elseif listlen < latestlen then
-				for i,client in next, latest do
-					if table.find(list, client) then continue end
-
-					local cell = clientsList:FindFirstChild(client)
-					if cell then cell:Destroy() end
-
-					table.remove(latest, i)
-				end
-			end
-		end
-		
-		clientsSocket.clientsRefresh.OnClientEvent:Connect(refresh)
-		
-		--contextAction:BindAction(leaderstatsAction, bindFunction, false, unpack(leaderstatsComb))
-		leaderstatsAcitonFun = function()
-			clientsList.Visible = not clientsList.Visible
-		end
-	end
-
-	local chat = mainGui.chat do
-		local messages = chat.messages
-		local box = chat.box
-
-		local pattern = messages.pattern
-		
-		local function newMessage(client, message) 
-			local messageBody = pattern:Clone()
-			
-			messageBody.Text = `[{client}]: {message}`
-			messageBody.Name = #messages:GetChildren()
-			messageBody.Visible = true
-			
-			messageBody.Parent = messages
-		end
-		
-		box.InputEnded:Connect(function(input)
-			if input.KeyCode == Enum.KeyCode.Return then
-				local message = box.Text:match'^%s*(.-)%s*$'
-				box.Text = ''
-				
-				if #message > 255 then
-					newMessage('Chat', 'Max message length is 255')
-				end
-				
-				clientsSocket.newMessage:FireServer(message)
-				newMessage(client.Name, message)
-			end
-		end)
-		clientsSocket.newMessage.OnClientEvent:Connect(newMessage)
-	end
-	
-	local hotpanel = mainGui.hotpanel do
-		local chatBox = hotpanel.chat
-		local playersBox = hotpanel.players
-		
-		chatBox.button.MouseButton1Down:Connect(function() 
-			chat.Visible = not chat.Visible
-		end)
-		playersBox.button.MouseButton1Down:Connect(function() 
-			clientsList.Visible = not clientsList.Visible
-		end)
-	end
-	
-	local statsFolder = mainGui.stats do
-		local nethealth = statsFolder.nethealth
-		
-		local networkStatsPattern = [[
-General <MTU size, Ping> : %d, %dms
-Instances <Size, Real size, Count> : %d, %d, %d
-Chat Buffer <Size, Real size, Len> : %d, %d, %d
-Close : LeftCtrl + LeftShift + One]]
-		
-		clientsSocket.statsRefresh.OnClientEvent:Connect(function(stream) 
-			local data = {networkStatsFormat:unpack(stream)}
-			
-			local netHealth = networkStatsPattern:format(
-				serverMTU, data[1], 
-				data[3], data[4], data[2],
-				data[6], data[7], data[5]
-			)
-			nethealth.Text = netHealth
-		end)
-		
-		--contextAction:BindAction(networkHealthAction, bindFunction, false, unpack(networkHealthComb))
-		nethealthActionFun = function()
-			nethealth.Visible = not nethealth.Visible
-		end
-	end
-end
-
-return main]]></ProtectedString>
-						<int64 name="SourceAssetId">-1</int64>
-						<BinaryString name="Tags"></BinaryString>
-					</Properties>
-				</Item>
-			</Item>
-			<Item class="Folder" referent="RBXF914A45F98444F82979EFB5A9DCE273F">
+			<Item class="Folder" referent="RBX64E4C9BB525144139A5DF0430CD0C41A">
 				<Properties>
 					<BinaryString name="AttributesSerialize"></BinaryString>
 					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -263,14 +75,14 @@ return main]]></ProtectedString>
 					<int64 name="SourceAssetId">-1</int64>
 					<BinaryString name="Tags"></BinaryString>
 				</Properties>
-				<Item class="ScreenGui" referent="RBXA5AF53F8DC874994A5A8D3C3CC095C7E">
+				<Item class="ScreenGui" referent="RBXB69868F956104A9EBDA820D5F2AADDDD">
 					<Properties>
 						<BinaryString name="AttributesSerialize"></BinaryString>
 						<bool name="AutoLocalize">true</bool>
 						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
 						<bool name="ClipToDeviceSafeArea">true</bool>
 						<bool name="DefinesCapabilities">false</bool>
-						<int name="DisplayOrder">0</int>
+						<int name="DisplayOrder">1</int>
 						<bool name="Enabled">true</bool>
 						<string name="Name">maingui</string>
 						<bool name="ResetOnSpawn">false</bool>
@@ -286,7 +98,7 @@ return main]]></ProtectedString>
 						<BinaryString name="Tags"></BinaryString>
 						<token name="ZIndexBehavior">1</token>
 					</Properties>
-					<Item class="ScrollingFrame" referent="RBXB56D8196F46E4B17BCA3A5121CA87B26">
+					<Item class="ScrollingFrame" referent="RBXAA11087254064158ADC9233D475B4800">
 						<Properties>
 							<bool name="Active">true</bool>
 							<Vector2 name="AnchorPoint">
@@ -375,7 +187,7 @@ return main]]></ProtectedString>
 							<bool name="Visible">true</bool>
 							<int name="ZIndex">1</int>
 						</Properties>
-						<Item class="UISizeConstraint" referent="RBX51B33A8A042A419EA0CF7F4A57B1F22F">
+						<Item class="UISizeConstraint" referent="RBXC82713141C9C40EA9C05B9B450310B29">
 							<Properties>
 								<BinaryString name="AttributesSerialize"></BinaryString>
 								<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -393,7 +205,7 @@ return main]]></ProtectedString>
 								<BinaryString name="Tags"></BinaryString>
 							</Properties>
 						</Item>
-						<Item class="Frame" referent="RBX601D56BB667949BF8E9CEBE8CA0FD29A">
+						<Item class="Frame" referent="RBX15E7C004DDD94B0D936C02768A0B1731">
 							<Properties>
 								<bool name="Active">false</bool>
 								<Vector2 name="AnchorPoint">
@@ -456,7 +268,7 @@ return main]]></ProtectedString>
 								<bool name="Visible">false</bool>
 								<int name="ZIndex">1</int>
 							</Properties>
-							<Item class="TextLabel" referent="RBX20D2C8C0D7EA4EF2A9D1CBBAFF2E85A3">
+							<Item class="TextLabel" referent="RBX9F9BB446C8F84DAE884D83063344737A">
 								<Properties>
 									<bool name="Active">false</bool>
 									<Vector2 name="AnchorPoint">
@@ -548,7 +360,7 @@ return main]]></ProtectedString>
 									<bool name="Visible">true</bool>
 									<int name="ZIndex">1</int>
 								</Properties>
-								<Item class="UITextSizeConstraint" referent="RBX995F7E53409C4DF8A3CF57AB0908F237">
+								<Item class="UITextSizeConstraint" referent="RBX73BC1200D0BE4E6A8A9C33DB7AF649BB">
 									<Properties>
 										<BinaryString name="AttributesSerialize"></BinaryString>
 										<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -562,7 +374,7 @@ return main]]></ProtectedString>
 								</Item>
 							</Item>
 						</Item>
-						<Item class="UIListLayout" referent="RBX11DBB13826D743ACBB737FD8886382EB">
+						<Item class="UIListLayout" referent="RBX425E17F988BD49A88FD7189B6D95796F">
 							<Properties>
 								<BinaryString name="AttributesSerialize"></BinaryString>
 								<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -585,7 +397,7 @@ return main]]></ProtectedString>
 							</Properties>
 						</Item>
 					</Item>
-					<Item class="Frame" referent="RBXF2AA9ADE89AB421182FA3B55788A2C7D">
+					<Item class="Frame" referent="RBX735CAEB78881441A8E10C9D247023274">
 						<Properties>
 							<bool name="Active">false</bool>
 							<Vector2 name="AnchorPoint">
@@ -648,7 +460,7 @@ return main]]></ProtectedString>
 							<bool name="Visible">true</bool>
 							<int name="ZIndex">1</int>
 						</Properties>
-						<Item class="TextBox" referent="RBXB173CD73D4504D0FB89EEC3CB50A9E74">
+						<Item class="TextBox" referent="RBXB5F60A99530445148167202331937FC3">
 							<Properties>
 								<bool name="Active">true</bool>
 								<Vector2 name="AnchorPoint">
@@ -750,7 +562,7 @@ return main]]></ProtectedString>
 								<bool name="Visible">true</bool>
 								<int name="ZIndex">1</int>
 							</Properties>
-							<Item class="UIPadding" referent="RBX4ED2C2DAE2A54288AF66AFF1A4467C42">
+							<Item class="UIPadding" referent="RBX8AFD49417AE945668FF58D1B241D06C2">
 								<Properties>
 									<BinaryString name="AttributesSerialize"></BinaryString>
 									<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -777,7 +589,7 @@ return main]]></ProtectedString>
 								</Properties>
 							</Item>
 						</Item>
-						<Item class="ScrollingFrame" referent="RBXE95448A3F4B54D5C9BAC7AAF2C4F988E">
+						<Item class="ScrollingFrame" referent="RBXC595A4AD5C5F4E5B922A351EDE95E200">
 							<Properties>
 								<bool name="Active">true</bool>
 								<Vector2 name="AnchorPoint">
@@ -866,7 +678,7 @@ return main]]></ProtectedString>
 								<bool name="Visible">true</bool>
 								<int name="ZIndex">1</int>
 							</Properties>
-							<Item class="UIListLayout" referent="RBX764C38AF73264F608872EBE5C6C98E24">
+							<Item class="UIListLayout" referent="RBX47580A2CAEA74CAB99EE6D36081C208D">
 								<Properties>
 									<BinaryString name="AttributesSerialize"></BinaryString>
 									<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -888,7 +700,7 @@ return main]]></ProtectedString>
 									<bool name="Wraps">false</bool>
 								</Properties>
 							</Item>
-							<Item class="TextLabel" referent="RBXC875110B43A84007BE63735618331633">
+							<Item class="TextLabel" referent="RBX0AD82B724CBD410ABAC1CECDCC344F03">
 								<Properties>
 									<bool name="Active">false</bool>
 									<Vector2 name="AnchorPoint">
@@ -982,7 +794,7 @@ return main]]></ProtectedString>
 								</Properties>
 							</Item>
 						</Item>
-						<Item class="UISizeConstraint" referent="RBX08C05462C3FE4DC082A61FE6468B8EBF">
+						<Item class="UISizeConstraint" referent="RBX7902B6E37D5F44CBAF3130DFC0C779ED">
 							<Properties>
 								<BinaryString name="AttributesSerialize"></BinaryString>
 								<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -1001,7 +813,7 @@ return main]]></ProtectedString>
 							</Properties>
 						</Item>
 					</Item>
-					<Item class="Frame" referent="RBXB467892736154B4EB174AC1D613E7228">
+					<Item class="Frame" referent="RBX4C3A44AA117748C1B338DD1357D95969">
 						<Properties>
 							<bool name="Active">false</bool>
 							<Vector2 name="AnchorPoint">
@@ -1064,7 +876,7 @@ return main]]></ProtectedString>
 							<bool name="Visible">true</bool>
 							<int name="ZIndex">2</int>
 						</Properties>
-						<Item class="UIListLayout" referent="RBX0A8ADA1E71B4442996ACD8E2485D6452">
+						<Item class="UIListLayout" referent="RBX5A03E2756F5641E2BBB99599918D1DE6">
 							<Properties>
 								<BinaryString name="AttributesSerialize"></BinaryString>
 								<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -1086,7 +898,7 @@ return main]]></ProtectedString>
 								<bool name="Wraps">false</bool>
 							</Properties>
 						</Item>
-						<Item class="Frame" referent="RBXECA6BAE246934ED9B6AA227D215751A7">
+						<Item class="Frame" referent="RBX1EEB1E3DD7D34F25BC6A359383A3992F">
 							<Properties>
 								<bool name="Active">false</bool>
 								<Vector2 name="AnchorPoint">
@@ -1149,7 +961,7 @@ return main]]></ProtectedString>
 								<bool name="Visible">true</bool>
 								<int name="ZIndex">1</int>
 							</Properties>
-							<Item class="TextButton" referent="RBXCF0ECB8900EB48609A220706AAACD79C">
+							<Item class="TextButton" referent="RBX182C196D99AC40F694E18403DE04D22B">
 								<Properties>
 									<bool name="Active">true</bool>
 									<Vector2 name="AnchorPoint">
@@ -1247,7 +1059,7 @@ return main]]></ProtectedString>
 								</Properties>
 							</Item>
 						</Item>
-						<Item class="Frame" referent="RBXCB0141E720AF4F13BBDE7D5842B9F5EF">
+						<Item class="Frame" referent="RBXAA7EA85068C646E9A0FDD5647B5AB595">
 							<Properties>
 								<bool name="Active">false</bool>
 								<Vector2 name="AnchorPoint">
@@ -1310,7 +1122,7 @@ return main]]></ProtectedString>
 								<bool name="Visible">true</bool>
 								<int name="ZIndex">1</int>
 							</Properties>
-							<Item class="TextButton" referent="RBX470A417854A34855A94E776F9B9CE42A">
+							<Item class="TextButton" referent="RBX8708EDC5717044CE91A26DF51602F3DE">
 								<Properties>
 									<bool name="Active">true</bool>
 									<Vector2 name="AnchorPoint">
@@ -1409,7 +1221,7 @@ return main]]></ProtectedString>
 							</Item>
 						</Item>
 					</Item>
-					<Item class="Folder" referent="RBX31114954C0974D28B62D17897CA55E61">
+					<Item class="Folder" referent="RBX5450CD35CB8442BA9B304B56FF062CBE">
 						<Properties>
 							<BinaryString name="AttributesSerialize"></BinaryString>
 							<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
@@ -1418,7 +1230,7 @@ return main]]></ProtectedString>
 							<int64 name="SourceAssetId">-1</int64>
 							<BinaryString name="Tags"></BinaryString>
 						</Properties>
-						<Item class="TextLabel" referent="RBXEFB4DCDF4E1F41A19C5B93941B54B38C">
+						<Item class="TextLabel" referent="RBX44B7BD9C778642FCA69237FC2232FC35">
 							<Properties>
 								<bool name="Active">false</bool>
 								<Vector2 name="AnchorPoint">
@@ -1513,7 +1325,1054 @@ return main]]></ProtectedString>
 						</Item>
 					</Item>
 				</Item>
+				<Item class="BillboardGui" referent="RBX868B0422C4DE43BFB15CF3160A41910C">
+					<Properties>
+						<bool name="Active">true</bool>
+						<Ref name="Adornee">null</Ref>
+						<bool name="AlwaysOnTop">true</bool>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<bool name="AutoLocalize">true</bool>
+						<float name="Brightness">1</float>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="ClipsDescendants">true</bool>
+						<bool name="DefinesCapabilities">false</bool>
+						<float name="DistanceLowerLimit">0</float>
+						<float name="DistanceStep">0</float>
+						<float name="DistanceUpperLimit">-1</float>
+						<bool name="Enabled">true</bool>
+						<Vector3 name="ExtentsOffset">
+							<X>0</X>
+							<Y>0</Y>
+							<Z>0</Z>
+						</Vector3>
+						<Vector3 name="ExtentsOffsetWorldSpace">
+							<X>0</X>
+							<Y>0</Y>
+							<Z>0</Z>
+						</Vector3>
+						<float name="LightInfluence">1</float>
+						<float name="MaxDistance">30</float>
+						<string name="Name">bubbleSpeech</string>
+						<Ref name="PlayerToHideFrom">null</Ref>
+						<bool name="ResetOnSpawn">true</bool>
+						<Ref name="RootLocalizationTable">null</Ref>
+						<token name="SelectionBehaviorDown">0</token>
+						<token name="SelectionBehaviorLeft">0</token>
+						<token name="SelectionBehaviorRight">0</token>
+						<token name="SelectionBehaviorUp">0</token>
+						<bool name="SelectionGroup">false</bool>
+						<UDim2 name="Size">
+							<XS>10</XS>
+							<XO>0</XO>
+							<YS>7</YS>
+							<YO>0</YO>
+						</UDim2>
+						<Vector2 name="SizeOffset">
+							<X>0</X>
+							<Y>0</Y>
+						</Vector2>
+						<int64 name="SourceAssetId">-1</int64>
+						<Vector3 name="StudsOffset">
+							<X>0</X>
+							<Y>6</Y>
+							<Z>0</Z>
+						</Vector3>
+						<Vector3 name="StudsOffsetWorldSpace">
+							<X>0</X>
+							<Y>0</Y>
+							<Z>0</Z>
+						</Vector3>
+						<BinaryString name="Tags"></BinaryString>
+						<token name="ZIndexBehavior">1</token>
+					</Properties>
+					<Item class="UIListLayout" referent="RBXB194B47825F94AC59E14AAF032E4F9C9">
+						<Properties>
+							<BinaryString name="AttributesSerialize"></BinaryString>
+							<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+							<bool name="DefinesCapabilities">false</bool>
+							<token name="FillDirection">1</token>
+							<token name="HorizontalAlignment">0</token>
+							<token name="HorizontalFlex">0</token>
+							<token name="ItemLineAlignment">0</token>
+							<string name="Name">UIListLayout</string>
+							<UDim name="Padding">
+								<S>0</S>
+								<O>0</O>
+							</UDim>
+							<token name="SortOrder">2</token>
+							<int64 name="SourceAssetId">-1</int64>
+							<BinaryString name="Tags"></BinaryString>
+							<token name="VerticalAlignment">2</token>
+							<token name="VerticalFlex">0</token>
+							<bool name="Wraps">false</bool>
+						</Properties>
+					</Item>
+					<Item class="CanvasGroup" referent="RBXD109B7FC0097438080A5AF2FB8C2F23B">
+						<Properties>
+							<bool name="Active">false</bool>
+							<Vector2 name="AnchorPoint">
+								<X>0</X>
+								<Y>0</Y>
+							</Vector2>
+							<BinaryString name="AttributesSerialize"></BinaryString>
+							<bool name="AutoLocalize">true</bool>
+							<token name="AutomaticSize">0</token>
+							<Color3 name="BackgroundColor3">
+								<R>1</R>
+								<G>1</G>
+								<B>1</B>
+							</Color3>
+							<float name="BackgroundTransparency">1</float>
+							<Color3 name="BorderColor3">
+								<R>0</R>
+								<G>0</G>
+								<B>0</B>
+							</Color3>
+							<token name="BorderMode">0</token>
+							<int name="BorderSizePixel">0</int>
+							<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+							<bool name="ClipsDescendants">true</bool>
+							<bool name="DefinesCapabilities">false</bool>
+							<bool name="Draggable">false</bool>
+							<Color3 name="GroupColor3">
+								<R>1</R>
+								<G>1</G>
+								<B>1</B>
+							</Color3>
+							<float name="GroupTransparency">0</float>
+							<bool name="Interactable">true</bool>
+							<int name="LayoutOrder">0</int>
+							<string name="Name">pattern</string>
+							<Ref name="NextSelectionDown">null</Ref>
+							<Ref name="NextSelectionLeft">null</Ref>
+							<Ref name="NextSelectionRight">null</Ref>
+							<Ref name="NextSelectionUp">null</Ref>
+							<UDim2 name="Position">
+								<XS>0</XS>
+								<XO>0</XO>
+								<YS>0</YS>
+								<YO>0</YO>
+							</UDim2>
+							<Ref name="RootLocalizationTable">null</Ref>
+							<float name="Rotation">0</float>
+							<bool name="Selectable">false</bool>
+							<token name="SelectionBehaviorDown">0</token>
+							<token name="SelectionBehaviorLeft">0</token>
+							<token name="SelectionBehaviorRight">0</token>
+							<token name="SelectionBehaviorUp">0</token>
+							<bool name="SelectionGroup">false</bool>
+							<Ref name="SelectionImageObject">null</Ref>
+							<int name="SelectionOrder">0</int>
+							<UDim2 name="Size">
+								<XS>0</XS>
+								<XO>150</XO>
+								<YS>0</YS>
+								<YO>0</YO>
+							</UDim2>
+							<token name="SizeConstraint">0</token>
+							<int64 name="SourceAssetId">-1</int64>
+							<BinaryString name="Tags"></BinaryString>
+							<bool name="Visible">false</bool>
+							<int name="ZIndex">1</int>
+						</Properties>
+						<Item class="TextLabel" referent="RBXC6B8D58608234570ADF2A35C89B905B7">
+							<Properties>
+								<bool name="Active">false</bool>
+								<Vector2 name="AnchorPoint">
+									<X>0.5</X>
+									<Y>1</Y>
+								</Vector2>
+								<BinaryString name="AttributesSerialize"></BinaryString>
+								<bool name="AutoLocalize">true</bool>
+								<token name="AutomaticSize">3</token>
+								<Color3 name="BackgroundColor3">
+									<R>0</R>
+									<G>0</G>
+									<B>0</B>
+								</Color3>
+								<float name="BackgroundTransparency">0.5</float>
+								<Color3 name="BorderColor3">
+									<R>0.105882362</R>
+									<G>0.164705887</G>
+									<B>0.207843155</B>
+								</Color3>
+								<token name="BorderMode">0</token>
+								<int name="BorderSizePixel">0</int>
+								<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+								<bool name="ClipsDescendants">false</bool>
+								<bool name="DefinesCapabilities">false</bool>
+								<bool name="Draggable">false</bool>
+								<Font name="FontFace">
+									<Family><url>rbxasset://fonts/families/Arial.json</url></Family>
+									<Weight>400</Weight>
+									<Style>Normal</Style>
+								</Font>
+								<bool name="Interactable">true</bool>
+								<int name="LayoutOrder">0</int>
+								<float name="LineHeight">1</float>
+								<string name="LocalizationMatchIdentifier"></string>
+								<string name="LocalizationMatchedSourceText"></string>
+								<int name="MaxVisibleGraphemes">-1</int>
+								<string name="Name">message</string>
+								<Ref name="NextSelectionDown">null</Ref>
+								<Ref name="NextSelectionLeft">null</Ref>
+								<Ref name="NextSelectionRight">null</Ref>
+								<Ref name="NextSelectionUp">null</Ref>
+								<UDim2 name="Position">
+									<XS>0.5</XS>
+									<XO>0</XO>
+									<YS>1</YS>
+									<YO>-7</YO>
+								</UDim2>
+								<bool name="RichText">true</bool>
+								<Ref name="RootLocalizationTable">null</Ref>
+								<float name="Rotation">0</float>
+								<bool name="Selectable">false</bool>
+								<token name="SelectionBehaviorDown">0</token>
+								<token name="SelectionBehaviorLeft">0</token>
+								<token name="SelectionBehaviorRight">0</token>
+								<token name="SelectionBehaviorUp">0</token>
+								<bool name="SelectionGroup">false</bool>
+								<Ref name="SelectionImageObject">null</Ref>
+								<int name="SelectionOrder">0</int>
+								<UDim2 name="Size">
+									<XS>0</XS>
+									<XO>0</XO>
+									<YS>0</YS>
+									<YO>0</YO>
+								</UDim2>
+								<token name="SizeConstraint">0</token>
+								<int64 name="SourceAssetId">-1</int64>
+								<BinaryString name="Tags"></BinaryString>
+								<string name="Text"></string>
+								<Color3 name="TextColor3">
+									<R>1</R>
+									<G>1</G>
+									<B>1</B>
+								</Color3>
+								<token name="TextDirection">0</token>
+								<bool name="TextScaled">false</bool>
+								<float name="TextSize">20</float>
+								<Color3 name="TextStrokeColor3">
+									<R>0</R>
+									<G>0</G>
+									<B>0</B>
+								</Color3>
+								<float name="TextStrokeTransparency">1</float>
+								<float name="TextTransparency">0</float>
+								<token name="TextTruncate">0</token>
+								<bool name="TextWrapped">true</bool>
+								<token name="TextXAlignment">2</token>
+								<token name="TextYAlignment">2</token>
+								<bool name="Visible">true</bool>
+								<int name="ZIndex">1</int>
+							</Properties>
+							<Item class="UICorner" referent="RBX1140ACA16BFC44D5B342A34F2957A5A9">
+								<Properties>
+									<BinaryString name="AttributesSerialize"></BinaryString>
+									<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+									<UDim name="CornerRadius">
+										<S>0</S>
+										<O>5</O>
+									</UDim>
+									<bool name="DefinesCapabilities">false</bool>
+									<string name="Name">UICorner</string>
+									<int64 name="SourceAssetId">-1</int64>
+									<BinaryString name="Tags"></BinaryString>
+								</Properties>
+							</Item>
+							<Item class="UIPadding" referent="RBXE605BBA209444DB59FF9226EFB6C7C0F">
+								<Properties>
+									<BinaryString name="AttributesSerialize"></BinaryString>
+									<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+									<bool name="DefinesCapabilities">false</bool>
+									<string name="Name">UIPadding</string>
+									<UDim name="PaddingBottom">
+										<S>0</S>
+										<O>5</O>
+									</UDim>
+									<UDim name="PaddingLeft">
+										<S>0</S>
+										<O>5</O>
+									</UDim>
+									<UDim name="PaddingRight">
+										<S>0</S>
+										<O>5</O>
+									</UDim>
+									<UDim name="PaddingTop">
+										<S>0</S>
+										<O>5</O>
+									</UDim>
+									<int64 name="SourceAssetId">-1</int64>
+									<BinaryString name="Tags"></BinaryString>
+								</Properties>
+							</Item>
+						</Item>
+						<Item class="ImageLabel" referent="RBX015088BCB6204C37B45D4FEC2C74EBB2">
+							<Properties>
+								<bool name="Active">false</bool>
+								<Vector2 name="AnchorPoint">
+									<X>0.5</X>
+									<Y>1</Y>
+								</Vector2>
+								<BinaryString name="AttributesSerialize"></BinaryString>
+								<bool name="AutoLocalize">true</bool>
+								<token name="AutomaticSize">0</token>
+								<Color3 name="BackgroundColor3">
+									<R>1</R>
+									<G>1</G>
+									<B>1</B>
+								</Color3>
+								<float name="BackgroundTransparency">1</float>
+								<Color3 name="BorderColor3">
+									<R>0.105882362</R>
+									<G>0.164705887</G>
+									<B>0.207843155</B>
+								</Color3>
+								<token name="BorderMode">0</token>
+								<int name="BorderSizePixel">0</int>
+								<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+								<bool name="ClipsDescendants">false</bool>
+								<bool name="DefinesCapabilities">false</bool>
+								<bool name="Draggable">false</bool>
+								<Content name="Image"><url>rbxassetid://5905337161</url></Content>
+								<Color3 name="ImageColor3">
+									<R>0</R>
+									<G>0</G>
+									<B>0</B>
+								</Color3>
+								<Vector2 name="ImageRectOffset">
+									<X>0</X>
+									<Y>0</Y>
+								</Vector2>
+								<Vector2 name="ImageRectSize">
+									<X>0</X>
+									<Y>0</Y>
+								</Vector2>
+								<float name="ImageTransparency">0.5</float>
+								<bool name="Interactable">true</bool>
+								<int name="LayoutOrder">0</int>
+								<string name="Name">mark</string>
+								<Ref name="NextSelectionDown">null</Ref>
+								<Ref name="NextSelectionLeft">null</Ref>
+								<Ref name="NextSelectionRight">null</Ref>
+								<Ref name="NextSelectionUp">null</Ref>
+								<UDim2 name="Position">
+									<XS>0.5</XS>
+									<XO>0</XO>
+									<YS>1</YS>
+									<YO>0</YO>
+								</UDim2>
+								<token name="ResampleMode">0</token>
+								<Ref name="RootLocalizationTable">null</Ref>
+								<float name="Rotation">0</float>
+								<token name="ScaleType">0</token>
+								<bool name="Selectable">false</bool>
+								<token name="SelectionBehaviorDown">0</token>
+								<token name="SelectionBehaviorLeft">0</token>
+								<token name="SelectionBehaviorRight">0</token>
+								<token name="SelectionBehaviorUp">0</token>
+								<bool name="SelectionGroup">false</bool>
+								<Ref name="SelectionImageObject">null</Ref>
+								<int name="SelectionOrder">0</int>
+								<UDim2 name="Size">
+									<XS>0</XS>
+									<XO>7</XO>
+									<YS>0</YS>
+									<YO>7</YO>
+								</UDim2>
+								<token name="SizeConstraint">0</token>
+								<Rect2D name="SliceCenter">
+									<min>
+										<X>0</X>
+										<Y>0</Y>
+									</min>
+									<max>
+										<X>0</X>
+										<Y>0</Y>
+									</max>
+								</Rect2D>
+								<float name="SliceScale">1</float>
+								<int64 name="SourceAssetId">-1</int64>
+								<BinaryString name="Tags"></BinaryString>
+								<UDim2 name="TileSize">
+									<XS>1</XS>
+									<XO>0</XO>
+									<YS>1</YS>
+									<YO>0</YO>
+								</UDim2>
+								<bool name="Visible">true</bool>
+								<int name="ZIndex">1</int>
+							</Properties>
+						</Item>
+					</Item>
+				</Item>
 			</Item>
+			<Item class="Folder" referent="RBXA3C899D16E294E6391EEF787D5F2F500">
+				<Properties>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">handlers</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+				<Item class="ModuleScript" referent="RBX0C883D88E5474DF386A83A64A4C32AA1">
+					<Properties>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<Content name="LinkedSource"><null></null></Content>
+						<string name="Name">guiManager</string>
+						<string name="ScriptGuid">{5228E35F-D41C-44EA-85EB-B4C93F0C1C16}</string>
+						<ProtectedString name="Source"><![CDATA[local starterGui = game:GetService'StarterGui'
+local replicatedStorage = game:GetService'ReplicatedStorage'
+local userInputServce = game:GetService'UserInputService'
+local players = game:GetService'Players'
+
+local master = script.Parent.Parent
+
+local source = master.source
+local objects = master.objects
+local handlers = master.handlers
+
+local clientsSocket = replicatedStorage:WaitForChild'ClientsSocket'
+local socketConfig = clientsSocket.SOCKET_CONFIG
+
+local serverMTU = socketConfig:GetAttribute'MTU'
+local networkStatsFormat = socketConfig:GetAttribute'networkStatsFormat'
+
+local event: event.constructor = require(objects.event)
+
+local client = players.LocalPlayer
+local clientGui = client.PlayerGui
+
+local clientConfig = shared.clientConfig
+
+local bubbleSpeechDecryptor = shared.bubbleSpeechDecryptor
+
+local bubbleSpeechHandler = require(handlers.bubbleSpeechHandler)
+
+local function main()
+	local serverPlayers = players:WaitForChild'ServerPlayers'
+	
+	if not serverPlayers then
+		return
+	end
+	
+	--[[ CORE GUI INIT ]]--
+	starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, false)
+	starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+	starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Captures, false)
+	
+	--[[ MAIN GUI ]]--
+	local mainGui = source.maingui:Clone()
+	mainGui.Parent = clientGui
+	
+	local networkHealthComb = {
+		Enum.KeyCode.LeftControl, Enum.KeyCode.LeftShift, Enum.KeyCode.One
+	}
+	local leaderstatsComb = {
+		Enum.KeyCode.Tab
+	}
+
+	local keysBuffer = {}
+	local function checkKeysComb(comb)
+		for i,key in next, comb do
+			if keysBuffer[i] ~= key then return end
+		end
+		return true
+	end
+	
+	local nethealthActionFun
+	local leaderstatsAcitonFun
+	
+	userInputServce.InputBegan:Connect(function(input) 
+		if input.UserInputType ~= Enum.UserInputType.Keyboard then
+			return
+		end
+		table.insert(keysBuffer, input.KeyCode)
+		if checkKeysComb(networkHealthComb) then
+			nethealthActionFun()
+		elseif checkKeysComb(leaderstatsComb) then
+			leaderstatsAcitonFun()
+		end
+	end)
+	userInputServce.InputEnded:Connect(function(input) 
+		table.remove(keysBuffer, table.find(keysBuffer, input.KeyCode))
+	end)
+	
+	local clientsList = mainGui.clientslist do
+		local pattern = clientsList.pattern
+
+		local latest = {}
+
+		local function refresh(list) 
+			local listlen, latestlen = #list, #latest
+
+			if listlen > latestlen then
+				for _,client in next, list do
+					if table.find(latest, client) then continue end
+
+					local newcell = pattern:Clone()
+					newcell.Parent = clientsList
+					newcell.Name = client
+					newcell.Visible = true
+
+					newcell.name.Text = client
+
+					table.insert(latest, client)
+				end
+			elseif listlen < latestlen then
+				for i,client in next, latest do
+					if table.find(list, client) then continue end
+
+					local cell = clientsList:FindFirstChild(client)
+					if cell then cell:Destroy() end
+
+					table.remove(latest, i)
+				end
+			end
+		end
+		
+		clientsSocket.clientsRefresh.OnClientEvent:Connect(refresh)
+		
+		--contextAction:BindAction(leaderstatsAction, bindFunction, false, unpack(leaderstatsComb))
+		leaderstatsAcitonFun = function()
+			clientsList.Visible = not clientsList.Visible
+		end
+	end
+
+	local chat = mainGui.chat do
+		local messages = chat.messages
+		local box = chat.box
+
+		local pattern = messages.pattern
+		
+		local function newMessage(client, message) 
+			local messageBody = pattern:Clone()
+			
+			messageBody.Text = `[{client}]: {message}`
+			messageBody.Name = #messages:GetChildren()
+			messageBody.Visible = true
+			
+			if clientConfig.bubbleChatEnabled then
+				local player = serverPlayers:FindFirstChild(client)
+				if player then
+					local character = player.Character.Value
+					local bubbleSpeech = character:FindFirstChild'bubbleSpeech'
+					
+					local speechEvent: event.object<string>
+					if not bubbleSpeech then
+						bubbleSpeech = source.bubbleSpeech:Clone()
+						bubbleSpeech.Parent = character
+						bubbleSpeech.Adornee = character:FindFirstChild'Head'
+						speechEvent = bubbleSpeechHandler(bubbleSpeech)
+						bubbleSpeechDecryptor[bubbleSpeech] = speechEvent
+					else
+						speechEvent = bubbleSpeechDecryptor[bubbleSpeech]
+					end
+					
+					speechEvent.callbacks.fire(message)
+				end
+			end
+			
+			messageBody.Parent = messages
+		end
+		
+		box.InputEnded:Connect(function(input)
+			if input.KeyCode == Enum.KeyCode.Return then
+				local message = box.Text:match'^%s*(.-)%s*$'
+				box.Text = ''
+				
+				if #message > 255 then
+					newMessage('Chat', 'Max message length is 255')
+				end
+				
+				clientsSocket.newMessage:FireServer(message)
+				newMessage(client.Name, message)
+			end
+		end)
+		clientsSocket.newMessage.OnClientEvent:Connect(newMessage)
+	end
+	
+	local hotpanel = mainGui.hotpanel do
+		local chatBox = hotpanel.chat
+		local playersBox = hotpanel.players
+		
+		chatBox.button.MouseButton1Down:Connect(function() 
+			chat.Visible = not chat.Visible
+		end)
+		playersBox.button.MouseButton1Down:Connect(function() 
+			clientsList.Visible = not clientsList.Visible
+		end)
+	end
+	
+	local statsFolder = mainGui.stats do
+		local nethealth = statsFolder.nethealth
+		
+		local networkStatsPattern = [[
+General <MTU size, Ping> : %d, %dms
+Instances <Size, Real size, Count> : %d, %d, %d
+Chat Buffer <Size, Real size, Len> : %d, %d, %d
+Close : LeftCtrl + LeftShift + One]]
+		
+		clientsSocket.statsRefresh.OnClientEvent:Connect(function(stream) 
+			local data = {networkStatsFormat:unpack(stream)}
+			
+			local netHealth = networkStatsPattern:format(
+				serverMTU, data[1], 
+				data[3], data[4], data[2],
+				data[6], data[7], data[5]
+			)
+			nethealth.Text = netHealth
+		end)
+		
+		--contextAction:BindAction(networkHealthAction, bindFunction, false, unpack(networkHealthComb))
+		nethealthActionFun = function()
+			nethealth.Visible = not nethealth.Visible
+		end
+	end
+end
+
+return main]]></ProtectedString>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBXC012AAFDD88148F19D47677C4181F5EB">
+					<Properties>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<Content name="LinkedSource"><null></null></Content>
+						<string name="Name">bubbleSpeechHandler</string>
+						<string name="ScriptGuid">{2A02B12E-9752-4FD8-B48A-585DC2BA6721}</string>
+						<ProtectedString name="Source"><![CDATA[local master = script.Parent.Parent
+local objects = master.objects
+
+local event: event.constructor = require(objects.event)
+local signal: signal.constructor = require(objects.event.signal)
+
+local lineAnimator: lineAnimator.constructor = require(objects.lineAnimator)
+local track: track.constructor = require(objects.lineAnimator.track)
+
+local bubbleSpeechDecryptor = shared.bubbleSpeechDecryptor
+
+--[[ CONFIGUERAITON ]]--
+local SPEECH_VISIBLE_TIME = 10
+local SPEECH_FADING_DURATION = .3
+
+local function main(bubbleSpeech: BillboardGui)
+	local pattern = bubbleSpeech.pattern
+	
+	local speechCounter = 0
+	
+	local function newMessage(speech: string)
+		local newSpeech = pattern:Clone()
+		
+		local speechAnimator: lineAnimator.object = --[[new]] lineAnimator(newSpeech)
+		
+		local lastSpeech = bubbleSpeech:FindFirstChild(speechCounter)
+		if lastSpeech then
+			lastSpeech.mark.Visible = false
+		end
+		speechCounter += 1
+		newSpeech.Name = speechCounter
+		
+		newSpeech.Parent = bubbleSpeech
+		newSpeech.message.Text = speech
+		newSpeech.Visible = true
+		
+		newSpeech.Size = UDim2.new(1, 0, 0, newSpeech.message.AbsoluteSize.Y)
+		
+		wait(SPEECH_VISIBLE_TIME)
+		local track: track.object = speechAnimator.connect('GroupTransparency', 1, SPEECH_FADING_DURATION)
+		task.wait(SPEECH_FADING_DURATION)
+		track.disconnect()
+		
+		newSpeech:Destroy()
+		speechAnimator.destroy()
+	end
+		
+	local speechEvent: event.object<string> = --[[new]] event()
+	
+	local messageAdded: signal.object<string> = speechEvent.connect(newMessage)
+	
+	bubbleSpeech.Parent.Destroying:Connect(function() 
+		messageAdded.disconnect()
+		bubbleSpeechDecryptor[bubbleSpeech] = nil
+	end)
+	
+	return speechEvent
+end
+
+return main]]></ProtectedString>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+				</Item>
+			</Item>
+			<Item class="Folder" referent="RBX536E530608814884BDA6B66BB06BCF5F">
+				<Properties>
+					<BinaryString name="AttributesSerialize"></BinaryString>
+					<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+					<bool name="DefinesCapabilities">false</bool>
+					<string name="Name">objects</string>
+					<int64 name="SourceAssetId">-1</int64>
+					<BinaryString name="Tags"></BinaryString>
+				</Properties>
+				<Item class="ModuleScript" referent="RBX1B2E21B44B8746239B4FAEBCB4D978DB">
+					<Properties>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<Content name="LinkedSource"><null></null></Content>
+						<string name="Name">event</string>
+						<string name="ScriptGuid">{C16859CE-5ACF-4CB6-914F-96C7CB4411BC}</string>
+						<ProtectedString name="Source"><![CDATA[local signal: signal.constructor = require(script.signal)
+
+type void = nil
+
+type callback<T...> = (T...) -> unknown
+type callbacksFun = (signal: signal.object) -> void
+
+type callbacks<T...> = {
+	[number]: signal.object,
+	
+	-- methods
+	
+	fire: callback<T...>,
+	add: callbacksFun, 
+	del: callbacksFun,
+	iterate: (_, last: signal.object?) -> (number, signal.object)
+}
+
+type event<T...> = {
+	-- properties
+	
+	callbacks: callbacks<T...>,
+	
+	-- methods
+	
+	connect: (callback: callback<T...>) -> signal.object<T...>,
+	wait: () -> void
+}
+type eventConstructor = () -> event
+
+export type object<T...> = event<T...>
+export type constructor = eventConstructor
+
+if shared.eventConstructor then
+	return shared.eventConstructor :: eventConstructor
+end
+
+local event: eventConstructor = function()
+	local new: event = {}
+	
+	local callbacks: callbacks = {}
+	
+	function callbacks.add(signal)
+		table.insert(callbacks, signal)
+	end
+	function callbacks.del(signal)
+		table.remove(callbacks, table.find(callbacks, signal))
+	end
+	do
+		local i = 0
+		function callbacks.iterate(_, last)
+			if not last then i = 0 end
+			i += 1
+			if callbacks[i] then return i, callbacks[i] end
+		end
+	end
+	
+	local fired, waiting
+	
+	function callbacks.fire(...)
+		if fired then
+			fired = false
+		end
+		for _,signal in callbacks.iterate do
+			coroutine.wrap(signal.callback)(...)
+		end
+	end
+	
+	new.callbacks = callbacks
+	
+	function new.connect(callback)
+		local newSignal: signal.object = --[[new]] signal(callback, new)
+		callbacks.add(newSignal)
+		return newSignal
+	end
+	function new.wait()
+		fired = true
+		repeat task.wait() until not fired
+	end
+	
+	return new
+end
+
+shared.eventConstructor = event
+
+return event]]></ProtectedString>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+					<Item class="ModuleScript" referent="RBX680298D542B04548AF924E59B90046BD">
+						<Properties>
+							<BinaryString name="AttributesSerialize"></BinaryString>
+							<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+							<bool name="DefinesCapabilities">false</bool>
+							<Content name="LinkedSource"><null></null></Content>
+							<string name="Name">signal</string>
+							<string name="ScriptGuid">{A1B29322-5016-4327-ABB3-E050CC1A98A9}</string>
+							<ProtectedString name="Source"><![CDATA[type void = nil
+
+type callback<T...> = (T...) -> unknown
+
+type signal<T...> = {
+	-- properties
+	
+	callback: callback<T...>,
+	parent: unknown,
+	
+	-- methods
+	
+	disconnect: () -> void
+}
+type signalConstructor = (
+	callback: callback<unknown>,
+	parent: unknown
+) -> signal
+
+export type object<T...> = signal<T...>
+export type constructor = signalConstructor
+
+if shared.signalConstructor then
+	return shared.signalConstructor :: signalConstructor
+end
+
+local signal: signalConstructor = function(callback, parent)
+	local new: signal = {}
+	
+	new.callback = callback
+	new.parent = parent
+	
+	function new.disconnect()
+		parent.callbacks.del(new)
+		new = nil
+	end
+	
+	return new
+end
+
+shared.signalConstructor = signal
+
+return signal]]></ProtectedString>
+							<int64 name="SourceAssetId">-1</int64>
+							<BinaryString name="Tags"></BinaryString>
+						</Properties>
+					</Item>
+				</Item>
+				<Item class="ModuleScript" referent="RBX998F6513F46D4415B9E176A024AE663A">
+					<Properties>
+						<BinaryString name="AttributesSerialize"></BinaryString>
+						<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+						<bool name="DefinesCapabilities">false</bool>
+						<Content name="LinkedSource"><null></null></Content>
+						<string name="Name">lineAnimator</string>
+						<string name="ScriptGuid">{C69B182B-D5EC-4434-9D0B-D6126C390493}</string>
+						<ProtectedString name="Source"><![CDATA[local track: track.constructor = require(script.track)
+
+type void = nil
+
+type subject = Instance & {[any]: any}
+type tracks = {[number]: track.object}
+
+type lineAnimator = {
+	-- properties
+	
+	instance: subject,
+	tracks: tracks,
+	
+	-- methods
+	
+	connect: (
+		prop: string & {string}, 
+		goal: number & {[string]: number}, 
+		duration: number?
+	) -> track.object,
+	destroy: () -> void
+}
+type lineAnimatorConstructor = (
+	instance: subject
+) -> lineAnimator
+
+export type object = lineAnimator
+export type constructor = lineAnimatorConstructor
+
+if shared.lineAnimatorConstructor then
+	return shared.lineAnimatorConstructor :: lineAnimatorConstructor
+end
+
+local lineAnimator: lineAnimatorConstructor = function(instance)
+	local new: lineAnimator = {}
+	
+	local tracks: tracks = {}
+	new.tracks = tracks
+	
+	function new.connect(prop, goal, duration)
+		local newtrack: track.object = --[[new]] track(new, prop, goal, duration)
+		
+		table.insert(tracks, newtrack)
+		
+		return newtrack
+	end
+	function new.destroy()
+		for _,v in next, tracks do
+			v.disconnect()
+		end
+		new = nil
+	end
+	
+	new.instance = instance
+	
+	return new
+end
+
+shared.lineAnimator = lineAnimator
+
+return lineAnimator]]></ProtectedString>
+						<int64 name="SourceAssetId">-1</int64>
+						<BinaryString name="Tags"></BinaryString>
+					</Properties>
+					<Item class="ModuleScript" referent="RBX51E370A1102841B2B0B9720BF401C6EB">
+						<Properties>
+							<BinaryString name="AttributesSerialize"></BinaryString>
+							<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+							<bool name="DefinesCapabilities">false</bool>
+							<Content name="LinkedSource"><null></null></Content>
+							<string name="Name">track</string>
+							<string name="ScriptGuid">{F7035F9D-9884-46C9-8999-9703760A9D0F}</string>
+							<ProtectedString name="Source"><![CDATA[type void = nil
+
+type subject = Instance & {[any]: any}
+
+type props = string & {string}
+type goals = number & {[string]: number}
+
+type track = {
+	-- properties
+	
+	prop: props,
+	goal: goals,
+	
+	-- methods
+	
+	disconnect: () -> void
+}
+type trackConstructor = (
+	parent: lineAnimator, 
+	prop: props, 
+	goal: goals, 
+	duration: number?
+) -> track
+
+export type object = track
+export type constructor = trackConstructor
+
+if shared.trackConstructor then
+	return shared.trackConstructor :: trackConstructor
+end
+
+local function linearBezie(p0, p1, t)
+	return (1 - t) * p0 + t * p1
+end
+
+local track: trackConstructor = function(parent, prop, goal, duration)
+	local new: track = {}
+	
+	local instance: subject = parent.instance
+	
+	duration = duration or 1
+	
+	local result = pcall(function() 
+		if typeof(prop) == 'table' then
+			for _,v in next, prop do
+				assert(typeof(instance[v]) == 'number')
+				assert(typeof(goal[v]) == 'number')
+			end
+			assert(typeof(goal) == 'table')
+		elseif typeof(prop) == 'string' then
+			assert(typeof(instance[prop]) == 'number')
+			assert(typeof(goal) == 'number')
+		else
+			assert(false)
+		end
+	end)
+	if not result then
+		warn('incorrect arguments')
+		return
+	end
+	
+	local thread = task.spawn(function() 
+		local delta = 1/duration * 1e-2
+		
+		if typeof(prop) == 'table' then
+			local starts = {}
+
+			for _,v in next, prop do
+				starts[v] = instance[v]
+			end
+
+			for i = 0, 1, delta do
+				for _,v in next, prop do
+					instance[v] = linearBezie(starts[v], goal[v], i)
+				end
+				task.wait()
+			end
+		else
+			local start = instance[prop]
+			
+			for i = 0, 1, delta do
+				instance[prop] = linearBezie(start, goal, i)
+				task.wait()
+			end
+		end
+	end)
+	
+	function new.disconnect()
+		table.remove(parent.tracks, table.find(parent.tracks, new))
+		task.cancel(thread)
+		new = nil
+	end
+	
+	new.prop = prop
+	new.goal = goal
+	
+	return new
+end
+
+shared.trackConstructor = track
+
+return track]]></ProtectedString>
+							<int64 name="SourceAssetId">-1</int64>
+							<BinaryString name="Tags"></BinaryString>
+						</Properties>
+					</Item>
+				</Item>
+			</Item>
+		</Item>
+		<Item class="Configuration" referent="RBX1F33B31CE64F44FF9CA40D7ABE720219">
+			<Properties>
+				<BinaryString name="AttributesSerialize">AQAAABEAAABidWJibGVDaGF0RW5hYmxlZAMB</BinaryString>
+				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+				<bool name="DefinesCapabilities">false</bool>
+				<string name="Name">CLIENT_CONFIG</string>
+				<int64 name="SourceAssetId">-1</int64>
+				<BinaryString name="Tags"></BinaryString>
+			</Properties>
 		</Item>
 	</Item>
 	<SharedStrings>
