@@ -1,5 +1,5 @@
 ## $\text{\color{lightgreen}Client install}$
-To connect to the server you need two client parts (Http and Rbx client)
+To connect to the server you need two client parts ([Http](https://github.com/semachkin/HttpRobloxServer/tree/master?tab=readme-ov-file#textcoloryellowto-install-http-client) and [Rbx](https://github.com/semachkin/HttpRobloxServer/tree/master?tab=readme-ov-file#textcoloryellowto-install-rbx-client) client)
 ##
 ### $\text{\color{yellow}To install Http client}$
 Download [rbxmx file](https://github.com/semachkin/HttpRobloxServer/releases/download/HttpClient/httpclient.rbxmx) and put it in ServerScriptService
