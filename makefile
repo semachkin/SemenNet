@@ -4,7 +4,7 @@ EXE := server
 FLAGS := -std=c99 -Wall
 LIBS := -lwsock32 -lws2_32
 
-SRC := ./server/
+SRC := ./src/
 TMP := ./temp/
 
 NEED := $(TMP)srvmain.o $(TMP)srvencoder.o $(TMP)srvhashlist.o
