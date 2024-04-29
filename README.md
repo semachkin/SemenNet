@@ -8,12 +8,10 @@ Download [rbxmx file](https://github.com/semachkin/HttpRobloxServer/releases/dow
 1. go to `C:\Users\user\AppData\Local\Roblox Studio\ExtraContent`
 2. find or create `scripts\PlayerScripts\StarterPlayerScripts`
 3. unpack [RbxClient.7z](https://github.com/semachkin/HttpRobloxServer/releases/download/RbxClient/RbxClient.7z) into this folder without creating subfolders
-
 ##
  - ##### To connect to the server, specify the host's proxy IP or private net IP address and server port in the SERVER_CONFIG attributes
  - ##### exchange_rate attribute usually does not exceed 8.3 requests per second. If you want more download [Roblox Mod Manager](https://github.com/MaximumADHD/Roblox-Studio-Mod-Manager) and increase fflag DFIntUserHttpRequestsPerMinuteLimit
 - ##### ⚠️ For now, instance replication only works fine on R6 avatars
-- 
 ## $\text{\color{lightgreen}Server download}$
 See [releases](https://github.com/semachkin/HttpRobloxServer/releases/tag/Server) for the latest build
 
