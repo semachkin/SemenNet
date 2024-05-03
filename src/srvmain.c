@@ -104,8 +104,12 @@ int main(void) {
             temprqstdat.buff = memset(temprqstdat.buff, 0, RQST_LEN);
             temprqstdat.bufflen = (uint16_t)SOCKRecv(lcur, temprqstdat.buff, RQST_LEN, RECV_FLAGS);
             WSAAssertO(temprqstdat.bufflen, ==SOCKET_ERROR, WSAETIMEDOUT, goto remove_sock;);
-
-            if (temprqstdat.bufflen > 0) {
+            
+            if (temprqstdat.bufflen == RQST_LEN) {
+                printwarn2("Buffer overflow\nNotice: request size more than %d", RQST_LEN);
+                goto remove_sock;
+            }
+            else if (temprqstdat.bufflen > 0) {
                 RQSTDInit(temprqstdat);
                 STATUSC sentres = RPNSSend(&temprqstdat, lcur);
 
@@ -279,7 +283,7 @@ login_end:
             RBXCLIENT curclient = RBXClients.buff[i];
             STRVAL name = STRVALObj(curclient.name, 0);
             if (name.p == NULL) continue;
-            if (strcmp(curclient.token, client->token) == 0) continue;
+            //if (strcmp(curclient.token, client->token) == 0) continue;
 
             RBXCLIENTDAT tempdat = curclient.tempdat;
             if (tempdat.instances == NULL) continue;
