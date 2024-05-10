@@ -121,7 +121,9 @@ char *MSGDecode(HASHLIST *list, STRVAL *keys, size_t keysc) {
     char *cur = buff.buff;
 
     #define blen buff.len
-    #define addc(c) *cur = c; blen++; cur++
+    #define checkoffset(o) if (blen + o >= RQST_LEN) return NULL
+    #define jmp(o) checkoffset(o); blen += o; cur += o
+    #define addc(c) *cur = c; jmp(1)
 
     for (size_t i = 0; i < keysc; i++) {
         STRVAL key = keys[i];
@@ -138,18 +140,18 @@ char *MSGDecode(HASHLIST *list, STRVAL *keys, size_t keysc) {
                 addc(MA_STRING); 
                 STRVAL *str = cast(obj.data, STRVAL*);
                 size_t len = str->len;
+                checkoffset(len);
                 memcpy(cur, str->p, len);
-                cur += len;
-                blen += len;
+                jmp(len);
             }
             break;
             case DT_LIST: {
                 addc(MA_LIST);
                 char *liststr = cast(obj.data, char*);
                 size_t listlen = strlen(liststr);
+                checkoffset(listlen);
                 memcpy(cur, liststr, listlen);
-                cur += listlen;
-                blen += listlen;
+                jmp(listlen);
             }
             break;
         }

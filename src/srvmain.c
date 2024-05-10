@@ -104,7 +104,7 @@ int main(void) {
             temprqstdat.buff = memset(temprqstdat.buff, 0, RQST_LEN);
             temprqstdat.bufflen = (uint16_t)SOCKRecv(lcur, temprqstdat.buff, RQST_LEN, RECV_FLAGS);
             WSAAssertO(temprqstdat.bufflen, ==SOCKET_ERROR, WSAETIMEDOUT, goto remove_sock;);
-            
+
             if (temprqstdat.bufflen == RQST_LEN) {
                 printwarn2("Buffer overflow\nNotice: request size more than %d", RQST_LEN);
                 goto remove_sock;
@@ -254,25 +254,42 @@ login_end:
     RBXCLIENT *client = RBXClients.buff + RBXClientIdx;
     client->lrqst = time(0); // update last request time
 
+    RBXCLIENTDAT *rbxtempdat = &client->tempdat;
+
     if (istype("DATAEX")) {
-        // indexing instances
+        HASHSTRVAL *nfobj; HashIndexing(list, "NF", nfobj);
+        if (nfobj == NULL) goto incorrect_message;
+        double *nfdoubleptr = cast(nfobj->obj.data, double*);
+        uint8_t nfboolean = cast(*nfdoubleptr, uint8_t);
+
         HASHSTRVAL *instancesobj; HashIndexing(list, "INSTANCES", instancesobj);
         if (instancesobj == NULL) goto incorrect_message;
         STRVAL *instancesstr = cast(instancesobj->obj.data, STRVAL*);
 
-        MEMFree(client->tempdat.instances);
+        char *lastinstances = rbxtempdat->instances;
+        size_t lastinstancessize = 0;
 
-        char *instancesdump; STRPrint(instancesdump, (*instancesstr));
-        client->tempdat.instances = instancesdump;
+        if (rbxtempdat->notfinished) lastinstancessize = strlen(lastinstances);
+        size_t instancesstrsize = instancesstr->len + lastinstancessize;
+        printf("LastInstancesSize = %lld\nInstancesStrSize = %lld\n", lastinstancessize, instancesstrsize);
 
-        // indexing messages
+        rbxtempdat->instances = ARRAlloc(char, instancesstrsize + 1);
+
+        if (lastinstancessize) memcpy(rbxtempdat->instances, lastinstances, lastinstancessize);
+        memcpy(rbxtempdat->instances + lastinstancessize, instancesstr->p, instancesstr->len);
+
+        rbxtempdat->instances[instancesstrsize] = Sf;
+        MEMFree(lastinstances);
+        
+        rbxtempdat->notfinished = nfboolean;
+
         HASHSTRVAL *messagesobj; HashIndexing(list, "MESSAGES", messagesobj);
         if (messagesobj != NULL) {
             STRVAL *messagesstr = cast(messagesobj->obj.data, STRVAL*);
-            MEMFree(client->tempdat.messages);
+            MEMFree(rbxtempdat->messages);
 
             char *messagesdump; STRPrint(messagesdump, (*messagesstr));
-            client->tempdat.messages = messagesdump;
+            rbxtempdat->messages = messagesdump;
         }
         
         HASHLIST responsedat = {0};
@@ -287,6 +304,7 @@ login_end:
 
             RBXCLIENTDAT tempdat = curclient.tempdat;
             if (tempdat.instances == NULL) continue;
+
             name.len = strlen(name.p);
             HASHLIST clientdat = {0};
             HashListRealloc(&clientdat, HASHLIST_STARTSIZE);
@@ -295,10 +313,13 @@ login_end:
             STRVAL instanceskey = keys[0];
             STRVAL messageskey = keys[1];
 
-            STRVAL *instances = ARRAlloc(STRVAL, 1);
-            instances->p = tempdat.instances;
-            instances->len = strlen(tempdat.instances);
-            TYPEOBJECT instancesobj = TYPEObj(instances, DT_STRING);
+            TYPEOBJECT instancesobj = TYPEObj(NULL, DT_NULL);
+            if (!tempdat.notfinished) {
+                STRVAL *instances = ARRAlloc(STRVAL, 1);
+                instances->p = tempdat.instances;
+                instances->len = strlen(tempdat.instances);
+                instancesobj = TYPEObj(instances, DT_STRING);
+            }
             HashSetVal(&clientdat, instanceskey, instancesobj);
 
             TYPEOBJECT messagestobj = TYPEObj(NULL, DT_NULL);
@@ -311,6 +332,11 @@ login_end:
             HashSetVal(&clientdat, messageskey, messagestobj);
 
             char *msgform = MSGDecode(&clientdat, keys, sizeof(keys)/sizeof(STRVAL));
+            if (msgform == NULL) {
+                printwarn3("Buffer overflow\nNotice: client %s decoded data more than %d", name.p, RQST_LEN); 
+                continue;
+            }
+
             TYPEOBJECT msgobj = TYPEObj(msgform, DT_LIST);
             HashSetVal(&responsedat, name, msgobj);
             namekeys.buff[namekeys.len] = name;
@@ -319,6 +345,11 @@ login_end:
         }
         char *msgpackage = MSGDecode(&responsedat, namekeys.buff, namekeys.len);
         HashListClean(&responsedat);
+        if (msgpackage == NULL) { 
+            printwarn2("Buffer overflow\nNotice: response size more than %d", RQST_LEN);
+            HTTPRESPONSE(package, ERR_RESPONSE_TOO_BIG);
+            return;
+        }
         HTTPRESPONSE(package, msgpackage);
         free(msgpackage);
     }

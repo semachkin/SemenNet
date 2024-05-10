@@ -15,7 +15,7 @@
 #define DEFAULT_LOGLVL 2
 #define DEFAULT_LOGFILE "dump.log"
 
-#define MAX_TIME_WITHOUT_REQUESTS 10
+#define MAX_TIME_WITHOUT_REQUESTS 9999
 
 #define INVALID_TOKEN ((~(size_t)0)-2)
 #define MAX_HASHLIST_SIZE ((~(uint16_t)0)-2)
@@ -70,6 +70,7 @@ typedef struct TYPEOBJECT_S {
 typedef struct RBXCLIENTDAT_S {
     char *instances;
     char *messages;
+    uint8_t notfinished;
 } RBXCLIENTDAT;
 
 typedef struct RBXCLIENT_S {
@@ -168,11 +169,13 @@ enum datatype {
 
 #define printwarn1(f) if printwarncond { printhead fprintf(lf, printwarnform f "\n", printdifftime); printf(f "\n"); printfoot }
 #define printwarn2(f, a0) if printwarncond { printhead fprintf(lf, printwarnform f "\n", printdifftime, a0); printf(f "\n", a0); printfoot }
+#define printwarn3(f, a0, a1) if printwarncond { printhead fprintf(lf, printwarnform f "\n", printdifftime, a0, a1); printf(f "\n", a0, a1); printfoot }
 
 #define cast(a, t) ((t)(a))
 
 #define MEMFree(p) \
-    if (p != NULL) free(p)
+    if (p != NULL) free(p); \
+    p = NULL;
 
 #define RBXClientAdd(c) \
     for (size_t i = 0; i < DEFAULT_LOG_LEN; i++) \
@@ -205,6 +208,7 @@ enum datatype {
     }
 
 #define ARRAlloc(t, s) (cast(malloc(s*sizeof(t)), t*))
+#define ARRRealloc(b, t, s) ((b) = cast(realloc(b, s*sizeof(t)), t*))
 
 #define STRPrint(pt, o) \
     { pt = ARRAlloc(char, o.len+1); memcpy(pt, o.p, o.len); pt[o.len] = Sf; }
@@ -251,6 +255,7 @@ enum datatype {
 
 #define ERR_INVALID_AGENT "Error 400 Invalid user agent"
 #define ERR_INCORRECT "Error 400 Incorrect message signature"
+#define ERR_RESPONSE_TOO_BIG "Error 400 Response size too big"
 #define ERR_SERVER_FULL "Error 400 Server full"
 #define ERR_INVALID_CLIENT "Error 401 Unauthorized"
 
