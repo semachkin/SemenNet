@@ -9,24 +9,26 @@
 #define Sf '\0'
 
 #define DEFAULT_PROTOCOL 0
-#define DEFAULT_LOG_LEN 15
+#define DEFAULT_LOG_LEN 2
 
 #define DEFAULT_PORT 1917
-#define DEFAULT_LOGLVL 2
-#define DEFAULT_LOGFILE "dump.log"
+#define DEFAULT_LOGLVL 5
+#define DEFAULT_LOGFILE "console.log"
 
-#define MAX_TIME_WITHOUT_REQUESTS 9999
+#define MAX_TIME_WITHOUT_REQUESTS 3
 
-#define INVALID_TOKEN ((~(size_t)0)-2)
-#define MAX_HASHLIST_SIZE ((~(uint16_t)0)-2)
+#define RQST_LEN 10240
 
-#define HASHLIST_STARTSIZE 16
+#define MAX_CLIENT_NAME_LEN 20
+#define MAX_DECODED_CLIENT_DATA_LEN (RQST_LEN/DEFAULT_LOG_LEN - MAX_CLIENT_NAME_LEN - 4 - 64)
+#define MAX_MESSAGE_LEN 255
+#define MAX_DECODED_MESSAGES_LEN (MAX_MESSAGE_LEN + 4)
+#define MAX_DECODED_MESSAGES_INDEX_LEN (MAX_DECODED_MESSAGES_LEN + 14)
+#define MAX_DECODED_INSTANCES_LEN (MAX_DECODED_CLIENT_DATA_LEN - MAX_DECODED_MESSAGES_INDEX_LEN - 16)
 
 #define LIST_EXTRA_CLOSE_BYTES 10*2
 
 #define FD_SETSIZE DEFAULT_LOG_LEN+1
-
-#define RQST_LEN 10240
 
 #define RECV_FLAGS 0
 #define SEND_FLAGS MSG_DONTROUTE
@@ -41,13 +43,13 @@
 
 #include <winsock2.h>
 #include <windows.h>
+#include "srvhashlist.h"
 
 #pragma region types
 
 #define TBuff(t, l) struct {t buff[l]; size_t len;}
 
 typedef FILE *filep;
-typedef unsigned char ENUMT;
 typedef unsigned short STATUSC;
 typedef fd_set CLIENTSDAT;
 
@@ -57,20 +59,12 @@ typedef struct CONFIG_S {
     char logf[MAX_PATH];
 } CONFIG;
 
-typedef struct STRVAL_S {
-    char *p; 
-    size_t len;
-} STRVAL;
-
-typedef struct TYPEOBJECT_S {
-    void *data;
-    ENUMT type;
-} TYPEOBJECT;
-
 typedef struct RBXCLIENTDAT_S {
+    char *validinstances;
     char *instances;
     char *messages;
-    uint8_t notfinished;
+    uint8_t nf;
+    uint8_t vnf;
 } RBXCLIENTDAT;
 
 typedef struct RBXCLIENT_S {
@@ -99,18 +93,6 @@ typedef struct RQSTBODY_S {
     STRVAL connection;
     STRVAL useragent;
 } RQSTBODY;
-
-typedef struct HASHSTRVAL_S {
-    TYPEOBJECT obj;
-    struct HASHSTRVAL_S *last;
-    uint16_t hash;
-} HASHSTRVAL;
-
-typedef struct HASHLIST_S {
-    HASHSTRVAL **buff;
-    uint16_t size;
-    uint16_t nuse;
-} HASHLIST;
  
 typedef struct RQSTDAT_S {
     char *buff;
@@ -213,8 +195,7 @@ enum datatype {
 #define STRPrint(pt, o) \
     { pt = ARRAlloc(char, o.len+1); memcpy(pt, o.p, o.len); pt[o.len] = Sf; }
 
-#define HashIndexing(l, s, p) \
-    { STRVAL key = STRVALObj(s, strlen(s)); p = HashGet(l, key); }
+#define MAX_NUM(t) ((~(t)0)-2)
 
 #define RQSTDInit(d) (d.err = RQSTInit(&d))
 
@@ -243,6 +224,9 @@ enum datatype {
 
 #define STRConst(s) (STRVALObj(s, sizeof(s)-1))
 
+#define INVALID_TOKEN MAX_NUM(size_t)
+#define MAX_HASHLIST_SIZE MAX_NUM(uint16_t)
+
 #define life for (;;)
 
 #define InlineApi static inline
@@ -251,25 +235,31 @@ enum datatype {
 
 #pragma region strings
 
-#define HTTPRESPONSE(s, m) (sprintf(s, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %lld\r\n\r\n%s", strlen(m), m))
+#define SUCCESS_OK "200 OK"
+#define SUCCESS_CREATED "201 Created"
+#define SUCCESS_NO_CONTENT "204 No Content"
+#define ERR_BAD_REQUEST "400 Bad Request"
+#define ERR_UNAUTHORIZED "401 Unauthorized"
+#define ERR_FORBIDDEN "403 Forbidden"
+#define ERR_NOT_FOUND "404 Not Found"
+#define ERR_INTERNAL_SERVER_ERR "500 Internal Server Error"
+#define ERR_NOT_IMPLEMENTED "501 Not Implemented"
+#define ERR_BAD_GATEWAY "502 Bad Gateway"
+#define ERR_SERVICE_UNAVAILABLE "503 Service unavailable"
+#define ERR_TIMEOUT "504 Gateway Timeout"
 
-#define ERR_INVALID_AGENT "Error 400 Invalid user agent"
-#define ERR_INCORRECT "Error 400 Incorrect message signature"
-#define ERR_RESPONSE_TOO_BIG "Error 400 Response size too big"
-#define ERR_SERVER_FULL "Error 400 Server full"
-#define ERR_INVALID_CLIENT "Error 401 Unauthorized"
-
-#define OK_SUCCESS "SUCCESS"
+#define HTTPRESPONSE(s, b) (sprintf(b, "HTTP/1.1 %s\r\n", s))
+#define HTTPRESPONSE_CONTENT(s, b, m) (sprintf(b, "HTTP/1.1 %s\r\nContent-Type: text/plain\r\nContent-Length: %lld\r\n\r\n%s", s, strlen(m), m))
+#define HTTPRESPONSE_OK(b, m) HTTPRESPONSE_CONTENT(SUCCESS_OK, b, m)
 
 #pragma endregion
+
+#pragma region declaractions
 
 void RQSTParse(RQSTDAT *rqst);
 HASHLIST *MSGEncode(char *msg, size_t msglen);
 char *MSGDecode(HASHLIST *list, STRVAL *keys, size_t keysc);
 
-void HashSetVal(HASHLIST *list, STRVAL key, TYPEOBJECT val);
-void HashListRealloc(HASHLIST *list, uint16_t newsize);
-void HashListClean(HASHLIST *list);
-HASHSTRVAL *HashGet(HASHLIST *list, STRVAL key);
+#pragma endregion
 
 #endif

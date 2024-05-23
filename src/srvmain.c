@@ -19,6 +19,10 @@ void MSGStartAction(HASHLIST *list, char *package);
 
 // ROBLOX CLIENTS
 static TBuff(RBXCLIENT, DEFAULT_LOG_LEN) RBXClients = {0};
+static BOOL RBXRequestsRefreshInstances = 0;
+
+// HISTORY
+static HASHLIST DATAEXClientsHistory = {0};
 
 size_t RBXClientFind(STRVAL token);
 void RBXClientsVerify();
@@ -56,6 +60,8 @@ int main(void) {
     CLIENTSDAT clientsdat;
     CLIENTSLIST clientslist = {0};
     RQSTDAT temprqstdat = {0};
+
+    HashListRealloc(&DATAEXClientsHistory, HASHLIST_STARTSIZE);
 
     temprqstdat.buff = ARRAlloc(char, RQST_LEN);
 
@@ -131,6 +137,8 @@ remove_sock:
         }
     }
 
+    HashListClean(&DATAEXClientsHistory);
+
     #undef stk_ptr
     #undef stk_end
 
@@ -159,11 +167,11 @@ STATUSC RPNSSend(RQSTDAT *rqst, SOCKET sock) {
     
     switch (rqst->err) {
         case STATUS_invalid_agent: {
-            HTTPRESPONSE(package, ERR_INVALID_AGENT);
+            HTTPRESPONSE(ERR_FORBIDDEN, package);
             goto send_start;
         };
         case STATUS_server_full: {
-            HTTPRESPONSE(package, ERR_SERVER_FULL);
+            HTTPRESPONSE(ERR_SERVICE_UNAVAILABLE, package);
             goto send_start;
         };
     }
@@ -176,7 +184,7 @@ STATUSC RPNSSend(RQSTDAT *rqst, SOCKET sock) {
         free(message);
     }
     else if (body->type == RT_GET) {
-        HTTPRESPONSE(package, OK_SUCCESS);
+        HTTPRESPONSE(SUCCESS_NO_CONTENT, package);
     }
 
     free(body);
@@ -208,15 +216,12 @@ send_start:
 
 void MSGStartAction(HASHLIST *list, char *package) {
     // indexing message type
-
-    HASHSTRVAL *typeobj; 
-    HashIndexing(list, "MT", typeobj);
+    HASHSTRVAL *typeobj; HashIndexing(list, "MT", typeobj);
     if (typeobj == NULL) goto incorrect_message;
     char *typestr = cast(typeobj->obj.data, STRVAL*)->p;
 
     // indexing token
-    HASHSTRVAL *tokenobj; 
-    HashIndexing(list, "TOKEN", tokenobj);
+    HASHSTRVAL *tokenobj; HashIndexing(list, "TOKEN", tokenobj);
     if (tokenobj == NULL) goto incorrect_message;
     STRVAL *tokenstr = cast(tokenobj->obj.data, STRVAL*);
 
@@ -235,20 +240,32 @@ void MSGStartAction(HASHLIST *list, char *package) {
         }
         char *clienttoken; STRPrint(clienttoken, (*tokenstr));
         char *clientname; STRPrint(clientname, (*namestr));
+
+        if (RBXClients.len >= DEFAULT_LOG_LEN) {
+            printinfo2("Rbx Client %s login failed. Server full", clientname);
+            HTTPRESPONSE(ERR_SERVICE_UNAVAILABLE, package);
+            return;
+        }
         RBXCLIENT client = {0};
         client.token = clienttoken;
         client.name = clientname;
         RBXClientAdd(client);
 
+        HASHLIST *DATAEXHistory = ARRAlloc(HASHLIST, 1);
+        memset(DATAEXHistory, 0, sizeof(HASHLIST));
+        HashListRealloc(DATAEXHistory, HASHLIST_STARTSIZE);
+        TYPEOBJECT DATAEXHistoryObj = TYPEObj(DATAEXHistory, DT_LIST);
+        HashSetVal(&DATAEXClientsHistory, *namestr, DATAEXHistoryObj);
+
         printinfo2("Rbx Client %s login to server", clientname);
-        HTTPRESPONSE(package, OK_SUCCESS);
+        HTTPRESPONSE(SUCCESS_CREATED, package);
     }
 
 login_end:
     size_t RBXClientIdx = RBXClientFind(*tokenstr);
     if (RBXClientIdx == INVALID_TOKEN) {
         printwarn1("Unathorized request attempt");
-        HTTPRESPONSE(package, ERR_INVALID_CLIENT);
+        HTTPRESPONSE(ERR_UNAUTHORIZED, package);
         return;
     }
     RBXCLIENT *client = RBXClients.buff + RBXClientIdx;
@@ -262,27 +279,40 @@ login_end:
         double *nfdoubleptr = cast(nfobj->obj.data, double*);
         uint8_t nfboolean = cast(*nfdoubleptr, uint8_t);
 
+		HASHSTRVAL *reqisvi; HashIndexing(list, "ISVI", reqisvi);
+		if (reqisvi == NULL) goto incorrect_message;
+		double *reqisvidoubleptr = cast(reqisvi->obj.data, double*);
+		uint8_t reqisviboolean = cast(*reqisvidoubleptr, uint8_t);
+
+		// INDEXING INSTANCES =====================================================================
         HASHSTRVAL *instancesobj; HashIndexing(list, "INSTANCES", instancesobj);
         if (instancesobj == NULL) goto incorrect_message;
         STRVAL *instancesstr = cast(instancesobj->obj.data, STRVAL*);
 
-        char *lastinstances = rbxtempdat->instances;
+        char *lastinstances = reqisviboolean ? rbxtempdat->validinstances : rbxtempdat->instances;
         size_t lastinstancessize = 0;
 
-        if (rbxtempdat->notfinished) lastinstancessize = strlen(lastinstances);
+        if ((reqisviboolean && rbxtempdat->vnf) || (!reqisviboolean && rbxtempdat->nf)) {
+            lastinstancessize = strlen(lastinstances);
+        }
         size_t instancesstrsize = instancesstr->len + lastinstancessize;
-        printf("LastInstancesSize = %lld\nInstancesStrSize = %lld\n", lastinstancessize, instancesstrsize);
-
-        rbxtempdat->instances = ARRAlloc(char, instancesstrsize + 1);
-
-        if (lastinstancessize) memcpy(rbxtempdat->instances, lastinstances, lastinstancessize);
-        memcpy(rbxtempdat->instances + lastinstancessize, instancesstr->p, instancesstr->len);
-
-        rbxtempdat->instances[instancesstrsize] = Sf;
-        MEMFree(lastinstances);
         
-        rbxtempdat->notfinished = nfboolean;
+        char *instancesreallcd = ARRAlloc(char, instancesstrsize + 1);
+        if (reqisviboolean) {
+            rbxtempdat->validinstances = instancesreallcd;
+            rbxtempdat->vnf = nfboolean;
+        } else {
+            rbxtempdat->instances = instancesreallcd;
+            rbxtempdat->nf = nfboolean;
+        }
 
+        if (lastinstancessize) memcpy(instancesreallcd, lastinstances, lastinstancessize);
+        memcpy(instancesreallcd + lastinstancessize, instancesstr->p, instancesstr->len);
+        instancesreallcd[instancesstrsize] = Sf;
+
+        MEMFree(lastinstances);
+
+        // INDEXING MESSAGES ====================================================================
         HASHSTRVAL *messagesobj; HashIndexing(list, "MESSAGES", messagesobj);
         if (messagesobj != NULL) {
             STRVAL *messagesstr = cast(messagesobj->obj.data, STRVAL*);
@@ -291,74 +321,174 @@ login_end:
             char *messagesdump; STRPrint(messagesdump, (*messagesstr));
             rbxtempdat->messages = messagesdump;
         }
+        // ======================================================================================
         
-        HASHLIST responsedat = {0};
+        HASHLIST clientsdat = {0};
         TBuff(STRVAL, DEFAULT_LOG_LEN) namekeys = {0};
-        HashListRealloc(&responsedat, HASHLIST_STARTSIZE);
+        HashListRealloc(&clientsdat, HASHLIST_STARTSIZE);
+        
+        HASHSTRVAL *DATAEXHistoryVal; HashIndexing(&DATAEXClientsHistory, client->name, DATAEXHistoryVal);
+        if (DATAEXHistoryVal == NULL) { 
+            printwarn2("Client %s data exchange history is lost", client->name);
+            HashListClean(&clientsdat);
+            return; 
+        }
+        HASHLIST *DATAEXHistory = cast(DATAEXHistoryVal->obj.data, HASHLIST*);
         
         for (size_t i = 0; i < DEFAULT_LOG_LEN; i++) {
             RBXCLIENT curclient = RBXClients.buff[i];
             STRVAL name = STRVALObj(curclient.name, 0);
             if (name.p == NULL) continue;
-            if (strcmp(curclient.token, client->token) == 0) continue;
+            if (strcmp(curclient.token, client->token) == 0) continue; // TODO: comment me for tests
 
             RBXCLIENTDAT tempdat = curclient.tempdat;
             if (tempdat.instances == NULL) continue;
-
+            
             name.len = strlen(name.p);
             HASHLIST clientdat = {0};
             HashListRealloc(&clientdat, HASHLIST_STARTSIZE);
-            STRVAL keys[2] = {STRConst("INSTANCES"), STRConst("MESSAGES")};
-
+            STRVAL keys[3] = {STRConst("INSTANCES"), STRConst("MESSAGES"), STRConst("NF")};
+            
             STRVAL instanceskey = keys[0];
             STRVAL messageskey = keys[1];
+            STRVAL notfinishedkey = keys[2];
 
+            double notfinishedv = FALSE;
+
+            HASHSTRVAL *instancesstackval; HashIndexing(DATAEXHistory, name.p, instancesstackval);
             TYPEOBJECT instancesobj = TYPEObj(NULL, DT_NULL);
-            if (!tempdat.notfinished) {
+
+            if (instancesstackval != NULL && instancesstackval->obj.data != NULL) {
+                STRVAL *stackval = cast(instancesstackval->obj.data, STRVAL*);
+                instancesobj = TYPEObj(stackval, DT_STRING);
+                HashSetVal(DATAEXHistory, name, TYPEObj(NULL, DT_NULL));
+            }
+            else if (!tempdat.nf && !tempdat.vnf) {
                 STRVAL *instances = ARRAlloc(STRVAL, 1);
                 instances->p = tempdat.instances;
                 instances->len = strlen(tempdat.instances);
                 instancesobj = TYPEObj(instances, DT_STRING);
             }
-            HashSetVal(&clientdat, instanceskey, instancesobj);
+            if (instancesobj.data != NULL) {
+                STRVAL *instancesstrval = cast(instancesobj.data, STRVAL*);
+                char *instancesstr = instancesstrval->p;
+                size_t instanceslen = instancesstrval->len;
+                if (instanceslen > MAX_DECODED_INSTANCES_LEN) {
+                    notfinishedv = TRUE;
+                    STRVAL *stackstr = ARRAlloc(STRVAL, 1);
+                    stackstr->p = instancesstr + MAX_DECODED_INSTANCES_LEN;
+                    stackstr->len = instanceslen - MAX_DECODED_INSTANCES_LEN;
+                    HashSetVal(DATAEXHistory, name, TYPEObj(stackstr, DT_STRING));
+                    instancesstrval->len = MAX_DECODED_INSTANCES_LEN;
+                }
+            }
 
-            TYPEOBJECT messagestobj = TYPEObj(NULL, DT_NULL);
+            HashSetVal(&clientdat, instanceskey, instancesobj);
+            
             if (tempdat.messages != NULL) {
                 STRVAL *messages = ARRAlloc(STRVAL, 1);
                 messages->p = tempdat.messages;
                 messages->len = strlen(tempdat.messages)+1;
-                messagestobj = TYPEObj(messages, DT_STRING);
+                TYPEOBJECT messagestobj = TYPEObj(messages, DT_STRING);
+                HashSetVal(&clientdat, messageskey, messagestobj);
             }
-            HashSetVal(&clientdat, messageskey, messagestobj);
+            if (notfinishedv) {
+                double *notfinished = ARRAlloc(double, 1);
+                *notfinished = notfinishedv;
+                TYPEOBJECT notfinishedobj = TYPEObj(notfinished, DT_NUMBER);
+                HashSetVal(&clientdat, notfinishedkey, notfinishedobj);
+            }
 
             char *msgform = MSGDecode(&clientdat, keys, sizeof(keys)/sizeof(STRVAL));
             if (msgform == NULL) {
                 printwarn3("Buffer overflow\nNotice: client %s decoded data more than %d", name.p, RQST_LEN); 
                 continue;
             }
-
             TYPEOBJECT msgobj = TYPEObj(msgform, DT_LIST);
-            HashSetVal(&responsedat, name, msgobj);
+            HashSetVal(&clientsdat, name, msgobj);
             namekeys.buff[namekeys.len] = name;
             namekeys.len++;
             HashListClean(&clientdat);
         }
-        char *msgpackage = MSGDecode(&responsedat, namekeys.buff, namekeys.len);
+
+        HASHLIST responsedat = {0};
+        HashListRealloc(&responsedat, HASHLIST_STARTSIZE);
+        STRVAL responsekeys[2] = {STRConst("CLIENTS"), STRConst("VIR")};
+
+        STRVAL clientskey = responsekeys[0];
+        STRVAL virkey = responsekeys[1];
+
+		char *clientspackage = MSGDecode(&clientsdat, namekeys.buff, namekeys.len);
+		HashListClean(&clientsdat);
+		HashSetVal(&responsedat, clientskey, TYPEObj(clientspackage, DT_LIST));
+        
+        if ((client->tempdat.validinstances == NULL) && RBXRequestsRefreshInstances) {
+            double *clientvir = ARRAlloc(double, 1);
+            *clientvir = cast(TRUE, double);
+		    HashSetVal(&responsedat, virkey, TYPEObj(clientvir, DT_NUMBER));
+        }
+        
+        char *msgpackage = MSGDecode(&responsedat, responsekeys, sizeof(responsekeys)/sizeof(STRVAL));
         HashListClean(&responsedat);
         if (msgpackage == NULL) { 
             printwarn2("Buffer overflow\nNotice: response size more than %d", RQST_LEN);
-            HTTPRESPONSE(package, ERR_RESPONSE_TOO_BIG);
+            HTTPRESPONSE(ERR_INTERNAL_SERVER_ERR, package);
             return;
         }
-        HTTPRESPONSE(package, msgpackage);
+        HTTPRESPONSE_OK(package, msgpackage);
         free(msgpackage);
+    }
+    if (istype("REQINSTANCES")) {
+        TBuff(STRVAL, DEFAULT_LOG_LEN) namekeys = {0};
+        RBXCLIENT *clientsbuff[DEFAULT_LOG_LEN] = {0};
+
+        HASHSTRVAL *DATAEXHistoryVal; HashIndexing(&DATAEXClientsHistory, client->name, DATAEXHistoryVal);
+        HASHLIST *DATAEXHistory = cast(DATAEXHistoryVal->obj.data, HASHLIST*);
+
+        for (size_t i = 0; i < DEFAULT_LOG_LEN; i++) {
+            RBXCLIENT *clientaddr = RBXClients.buff + i;
+            RBXCLIENT curclient = *clientaddr;
+            if (curclient.name == NULL) continue;
+            if (strcmp(curclient.token, client->token) == 0) continue;
+
+            RBXCLIENTDAT tempdat = curclient.tempdat;
+            if (tempdat.validinstances == NULL && !tempdat.vnf) {
+                RBXRequestsRefreshInstances = TRUE;
+                HTTPRESPONSE(SUCCESS_NO_CONTENT, package);
+                return;
+            }
+
+            clientsbuff[namekeys.len] = clientaddr;
+            namekeys.buff[namekeys.len] = STRVALObj(curclient.name, strlen(curclient.name));
+            namekeys.len++;
+        }
+        for (size_t i = 0; i < namekeys.len; i++) {
+            RBXCLIENT *curclient = clientsbuff[i];
+            STRVAL clientname = namekeys.buff[i];
+            char *validinstances = curclient->tempdat.validinstances;
+
+            size_t instancessize = strlen(validinstances);
+            char *instancesclone = ARRAlloc(char, instancessize+1);
+            memcpy(instancesclone, validinstances, instancessize);
+            instancesclone[instancessize] = Sf;
+
+            STRVAL *stackstr = ARRAlloc(STRVAL, 1);
+            stackstr->len = instancessize;
+            stackstr->p = instancesclone;
+
+            HashSetVal(DATAEXHistory, clientname, TYPEObj(stackstr, DT_STRING));
+            MEMFree(validinstances);
+        }
+
+        RBXRequestsRefreshInstances = FALSE;
+        HTTPRESPONSE(SUCCESS_CREATED, package);
     }
 
     #undef istype
     return;
 
 incorrect_message:
-    HTTPRESPONSE(package, ERR_INCORRECT);
+    HTTPRESPONSE(ERR_BAD_REQUEST, package);
 }
 
 void RBXClientsVerify() {
@@ -370,8 +500,16 @@ void RBXClientsVerify() {
         uint16_t diff = (uint16_t)difftime(curtime, client.lrqst);
 
         if (diff > MAX_TIME_WITHOUT_REQUESTS) {
+            HASHSTRVAL *DATAEXHistory; HashIndexing(&DATAEXClientsHistory, client.name, DATAEXHistory);
+            if (DATAEXHistory != NULL) {
+                HASHLIST *history = cast(DATAEXHistory->obj.data, HASHLIST*);
+                HashListClean(history);
+                HashSetVal(&DATAEXClientsHistory, STRVALObj(client.name, strlen(client.name)), TYPEObj(NULL, DT_NULL));
+            }
+
             printinfo2("Rbx Client %s disconnected", client.name);
             RBXClientClean(client);
+
             RBXClients.buff[i] = (RBXCLIENT){0};
         }
     }

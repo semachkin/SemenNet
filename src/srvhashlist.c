@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include "srvdata.h"
+#include "srvhashlist.h"
 
 void HashListRealloc(HASHLIST *list, uint16_t newsize) {
     //printf("List realloc to %d\n", newsize);

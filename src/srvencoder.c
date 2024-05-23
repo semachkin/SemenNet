@@ -60,7 +60,7 @@ HASHLIST *MSGEncode(char *msg, size_t msglen) {
                 size_t listsize = msg - start;
                 msg++;
                 HASHLIST *listobj = MSGEncode(val.p, listsize + 2 + LIST_EXTRA_CLOSE_BYTES);
-                obj = TYPEObj(listobj, DT_LIST);*/ 
+                obj = TYPEObj(listobj, DT_HASHLIST);*/ 
 
                 findcloser(MA_LIST, MA_LISTEND);
                 size_t listlen = msg - val.p;
@@ -122,17 +122,17 @@ char *MSGDecode(HASHLIST *list, STRVAL *keys, size_t keysc) {
 
     #define blen buff.len
     #define checkoffset(o) if (blen + o >= RQST_LEN) return NULL
-    #define jmp(o) checkoffset(o); blen += o; cur += o
-    #define addc(c) *cur = c; jmp(1)
+    #define jmp(o) blen += o; cur += o
+    #define addc(c) checkoffset(1); *cur = c; jmp(1)
 
     for (size_t i = 0; i < keysc; i++) {
         STRVAL key = keys[i];
         HASHSTRVAL *val = HashGet(list, key);
         if (val == NULL) continue; 
         if (val->obj.data == NULL) continue;
+        checkoffset(key.len);
         memcpy(cur, key.p, key.len);
-        cur += key.len;
-        blen += key.len;
+        jmp(key.len);
         addc('=');
         TYPEOBJECT obj = val->obj;
         switch (obj.type) {
@@ -152,6 +152,14 @@ char *MSGDecode(HASHLIST *list, STRVAL *keys, size_t keysc) {
                 checkoffset(listlen);
                 memcpy(cur, liststr, listlen);
                 jmp(listlen);
+            }
+            break;
+            case DT_NUMBER: {
+                addc(MA_NUMBER);
+                double *number = cast(obj.data, double*);
+                checkoffset(8);
+                sprintf(cur, "%f", *number);
+                jmp(8);
             }
             break;
         }
