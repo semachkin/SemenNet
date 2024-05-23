@@ -5,9 +5,12 @@ To connect to the server you need two client parts ([Http](https://github.com/se
 Download [rbxmx file](https://github.com/semachkin/HttpRobloxServer/releases/download/HttpClient/httpclient.rbxmx) and put it in ServerScriptService
 ##
 ### $\text{\color{yellow}To install Rbx client}$
+#### root folder method
 1. go to `C:\Users\user\AppData\Local\Roblox\Versions\Current Version` or right click on the Roblox Studio shortcut on your desktop and select the file location
 2. find or create `ExtraContent\scripts\PlayerScripts\StarterPlayerScripts`
 3. unpack [RbxClient.7z](https://github.com/semachkin/HttpRobloxServer/releases/download/RbxClient/RbxClient.7z) into this folder without creating subfolders
+#### staterplayerscripts method
+download [rbxclient.rbxmx and](https://github.com/semachkin/HttpRobloxServer/releases/download/RbxClient/rbxclient.rbxmx) put it in StartetPlayerScripts
 ##
  - ##### To connect to the server, specify the host's proxy IP or private net IP address and server port in the SERVER_CONFIG attributes
  - ##### exchange_rate attribute usually does not exceed 8.3 requests per second. If you want more download [Roblox Mod Manager](https://github.com/MaximumADHD/Roblox-Studio-Mod-Manager) and increase fflag DFIntUserHttpRequestsPerMinuteLimit
