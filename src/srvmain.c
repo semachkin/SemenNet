@@ -511,6 +511,7 @@ void RBXClientsVerify() {
             RBXClientClean(client);
 
             RBXClients.buff[i] = (RBXCLIENT){0};
+            RBXClients.len--;
         }
     }
 }
