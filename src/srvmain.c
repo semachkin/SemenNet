@@ -284,7 +284,6 @@ login_end:
 		double *reqisvidoubleptr = cast(reqisvi->obj.data, double*);
 		uint8_t reqisviboolean = cast(*reqisvidoubleptr, uint8_t);
 
-		// INDEXING INSTANCES =====================================================================
         HASHSTRVAL *instancesobj; HashIndexing(list, "INSTANCES", instancesobj);
         if (instancesobj == NULL) goto incorrect_message;
         STRVAL *instancesstr = cast(instancesobj->obj.data, STRVAL*);
@@ -312,7 +311,6 @@ login_end:
 
         MEMFree(lastinstances);
 
-        // INDEXING MESSAGES ====================================================================
         HASHSTRVAL *messagesobj; HashIndexing(list, "MESSAGES", messagesobj);
         if (messagesobj != NULL) {
             STRVAL *messagesstr = cast(messagesobj->obj.data, STRVAL*);
@@ -321,7 +319,6 @@ login_end:
             char *messagesdump; STRPrint(messagesdump, (*messagesstr));
             rbxtempdat->messages = messagesdump;
         }
-        // ======================================================================================
         
         HASHLIST clientsdat = {0};
         TBuff(STRVAL, DEFAULT_LOG_LEN) namekeys = {0};
@@ -422,7 +419,7 @@ login_end:
 		HashListClean(&clientsdat);
 		HashSetVal(&responsedat, clientskey, TYPEObj(clientspackage, DT_LIST));
         
-        if ((client->tempdat.validinstances == NULL) && RBXRequestsRefreshInstances) {
+        if ((client->tempdat.validinstances == NULL || client->tempdat.vnf) && RBXRequestsRefreshInstances) {
             double *clientvir = ARRAlloc(double, 1);
             *clientvir = cast(TRUE, double);
 		    HashSetVal(&responsedat, virkey, TYPEObj(clientvir, DT_NUMBER));
