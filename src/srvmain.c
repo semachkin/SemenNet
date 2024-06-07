@@ -336,7 +336,7 @@ login_end:
             RBXCLIENT curclient = RBXClients.buff[i];
             STRVAL name = STRVALObj(curclient.name, 0);
             if (name.p == NULL) continue;
-            if (strcmp(curclient.token, client->token) == 0) continue; // TODO: comment me for tests
+            if (strcmp(curclient.token, client->token) == 0) continue; // TODO: comment me for tests :3
 
             RBXCLIENTDAT tempdat = curclient.tempdat;
             if (tempdat.instances == NULL) continue;
@@ -360,10 +360,13 @@ login_end:
                 instancesobj = TYPEObj(stackval, DT_STRING);
                 HashSetVal(DATAEXHistory, name, TYPEObj(NULL, DT_NULL));
             }
-            else if (!tempdat.nf && !tempdat.vnf) {
+            else if (!tempdat.nf) {
                 STRVAL *instances = ARRAlloc(STRVAL, 1);
-                instances->p = tempdat.instances;
                 instances->len = strlen(tempdat.instances);
+                char *instancescopy = ARRAlloc(char, instances->len+1);
+                memcpy(instancescopy, tempdat.instances, instances->len);
+                instancescopy[instances->len] = Sf;
+                instances->p = instancescopy;
                 instancesobj = TYPEObj(instances, DT_STRING);
             }
             if (instancesobj.data != NULL) {
@@ -373,8 +376,10 @@ login_end:
                 if (instanceslen > MAX_DECODED_INSTANCES_LEN) {
                     notfinishedv = TRUE;
                     STRVAL *stackstr = ARRAlloc(STRVAL, 1);
-                    stackstr->p = instancesstr + MAX_DECODED_INSTANCES_LEN;
                     stackstr->len = instanceslen - MAX_DECODED_INSTANCES_LEN;
+                    char *instancescopy = ARRAlloc(char, stackstr->len);
+                    memcpy(instancescopy, instancesstr + MAX_DECODED_INSTANCES_LEN, stackstr->len);
+                    stackstr->p = instancescopy;
                     HashSetVal(DATAEXHistory, name, TYPEObj(stackstr, DT_STRING));
                     instancesstrval->len = MAX_DECODED_INSTANCES_LEN;
                 }
@@ -400,6 +405,10 @@ login_end:
             if (msgform == NULL) {
                 printwarn3("Buffer overflow\nNotice: client %s decoded data more than %d", name.p, RQST_LEN); 
                 continue;
+            }
+            if (instancesobj.data != NULL) {
+                STRVAL *val = cast(instancesobj.data, STRVAL*);
+                MEMFree(val->p);
             }
             TYPEOBJECT msgobj = TYPEObj(msgform, DT_LIST);
             HashSetVal(&clientsdat, name, msgobj);
@@ -449,7 +458,7 @@ login_end:
             if (strcmp(curclient.token, client->token) == 0) continue;
 
             RBXCLIENTDAT tempdat = curclient.tempdat;
-            if (tempdat.validinstances == NULL && !tempdat.vnf) {
+            if (tempdat.validinstances == NULL || tempdat.vnf) {
                 RBXRequestsRefreshInstances = TRUE;
                 HTTPRESPONSE(SUCCESS_NO_CONTENT, package);
                 return;
